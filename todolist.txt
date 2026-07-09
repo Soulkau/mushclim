@@ -1,0 +1,5 @@
+//https://crates.io/crates/mqtt-async-embedded
+- Remove all alloc usage
+- Error handling
+- Add pair command handling, auth command handling and handshake command handling before passing to the talky generateds handler, make nvm storage manager
+- Connection authentication
