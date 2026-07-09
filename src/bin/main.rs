@@ -7,8 +7,8 @@
 )]
 
 extern crate alloc;
-
 use bt_hci::controller::ExternalController;
+use core::fmt::Write;
 use driverse::am2301::Am2301;
 use driverse::relay::Relay;
 use embassy_executor::Spawner;
@@ -24,6 +24,7 @@ use esp_hal::clock::CpuClock;
 
 use esp_hal::efuse::Efuse;
 use esp_hal::gpio::{Output, OutputConfig};
+use esp_hal::i2c::master::{Config, I2c};
 use esp_hal::peripherals::SHA;
 use esp_hal::rng::Rng;
 use esp_hal::sha::{Sha, Sha256};
@@ -32,9 +33,11 @@ use esp_println::logger::init_logger;
 use esp_radio::ble::controller::BleConnector;
 use esp_storage::FlashStorage;
 
+use heapless::String;
 use log::info;
 use mushclim::MushclimConfig;
 use mushclim::exhaust::ExhaustManager;
+use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS};
 use mushclim::measurements::{
     MeasurementError, MeasurementManager, MeasurementProvider, Measurements,
 };
@@ -121,7 +124,24 @@ async fn main(s: Spawner) -> ! {
     .into_flex();
     out.set_input_enable(true);
     let am2301 = Am2301::new(out);
-
+    let lcd: Option<Lcd> = match I2c::new(peripherals.I2C0, Config::default()) {
+        Ok(i2c) => {
+            log::info!("Here");
+            let mut lcd = Lcd::new(
+                i2c.with_scl(peripherals.GPIO23)
+                    .with_sda(peripherals.GPIO22)
+                    .into_async(),
+                LCD_ADDRESS,
+                RGB_ADDRESS,
+            );
+            log::info!("LCD initialized");
+            match lcd.init().await {
+                Ok(()) => Some(lcd),
+                Err(_) => None,
+            }
+        }
+        Err(_) => None,
+    };
     let disco = create_relay!(peripherals.GPIO5);
     let fan = create_relay!(peripherals.GPIO6);
     let humidity = create_relay!(peripherals.GPIO7);
@@ -132,6 +152,7 @@ async fn main(s: Spawner) -> ! {
     let exhaust = ExhaustManager::new(fan, &config);
 
     let mut mushclim: MushclimApp<'static, _> = MushclimApp {
+        lcd,
         config,
         measurement_manager,
         lights,
@@ -185,6 +206,7 @@ fn create_device_id(sha: SHA<'static>) -> DeviceID {
 
 struct MushclimApp<'a, P: MeasurementProvider> {
     measurement_manager: MeasurementManager<P>,
+    lcd: Option<Lcd>,
     exhaust: ExhaustManager<'a>,
     config: MushclimConfig,
     lights: Relay<Output<'a>>,
@@ -199,6 +221,8 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
 
         log::info!("Starting sensor calibration");
 
+        self.display_calibrating().await;
+
         let Ok(_) = self.measurement_manager.calibrate(&self.config).await else {
             log::error!("Failed to calibrate measurements");
             self.enter_safe_mode().await
@@ -209,7 +233,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             match self.acquire_safe_measurement().await {
                 Some(stats) => {
                     self.log_current_measurements(stats);
-
+                    self.display_measurements(stats).await;
                     // "проверить влажность, включить полевалку если надо"
                     let current_humidity = stats.humidity;
                     let low_bound = *self.config.humidity_threshold.start();
@@ -277,7 +301,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         self.humidity.off();
         self.exhaust.reset();
         let mut was_exhaust_active = false;
-
+        self.display_safe_mode().await;
         loop {
             let is_exhaust_active = self.exhaust.tick().await;
 
@@ -300,6 +324,29 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             was_exhaust_active = is_exhaust_active;
 
             Timer::after_secs(60).await;
+        }
+    }
+
+    pub async fn display_calibrating(&mut self) {
+        if let Some(lcd) = self.lcd.as_mut() {
+            let _ = lcd.set_rgb(255, 0, 0).await;
+            let _ = lcd.write_str_no("Calibrating").await;
+        }
+    }
+
+    pub async fn display_measurements(&mut self, stats: Measurements) {
+        if let Some(lcd) = self.lcd.as_mut() {
+            let mut line: String<32> = String::new();
+            let _ = write!(line, "T:{:.1}C H:{:.0}%", stats.temperature, stats.humidity);
+            let _ = lcd.write_str_no(&line).await;
+        }
+    }
+
+    /// Flip the LCD into a visual "safe mode" indicator: red backlight + message.
+    pub async fn display_safe_mode(&mut self) {
+        if let Some(lcd) = self.lcd.as_mut() {
+            let _ = lcd.set_rgb(255, 0, 0).await;
+            let _ = lcd.write_str_no("Safe mode").await;
         }
     }
 

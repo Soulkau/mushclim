@@ -88,13 +88,13 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                     consecutive_failures = 0;
 
                     log::info!(
-                        "Calibration sample {}/10 stored successfully. Temp: {}, Hum: {}",
+                        "Calibration sample {}/5 stored successfully. Temp: {}, Hum: {}",
                         successful_samples,
                         m.temperature,
                         m.humidity
                     );
 
-                    Timer::after_secs(30).await;
+                    Timer::after_secs(10).await;
                 }
                 Err(e) => {
                     consecutive_failures += 1;

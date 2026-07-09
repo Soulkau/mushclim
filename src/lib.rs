@@ -3,7 +3,9 @@
 use core::ops::RangeInclusive;
 
 pub mod exhaust;
+pub mod lcd;
 pub mod measurements;
+
 #[macro_export]
 macro_rules! arcmutex {
     ($val:expr) => {{
@@ -34,7 +36,7 @@ impl Default for MushclimConfig {
             retry_count: 5,
             max_temp_delta: 5,
             max_humidity_delta: 10,
-            calibration_samples: 10,
+            calibration_samples: 5,
             safe_mode_sleep: 600,
             safe_humidity_duty_cycle: 60,
             exhaust_duty_cycle: 2,
