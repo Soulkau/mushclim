@@ -239,7 +239,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                     let low_bound = *self.config.humidity_threshold.start();
                     let comfort_bound = *self.config.humidity_threshold.end();
 
-                    if current_humidity <= low_bound {
+                    if current_humidity <= low_bound && !self.exhaust.is_turned_on() {
                         if !self.humidity.is_on() {
                             log::info!(
                                 "Humidity ({}%) below low bound ({low_bound}%). Turning humidifier ON.",

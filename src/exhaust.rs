@@ -48,6 +48,10 @@ impl<'a> ExhaustManager<'a> {
         is_turned_on
     }
 
+    pub fn is_turned_on(&self) -> bool {
+        self.exhaust.is_on()
+    }
+
     pub fn reset(&mut self) {
         self.exhaust.off();
         self.minutes_elapsed = 0;
