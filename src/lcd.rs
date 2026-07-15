@@ -191,16 +191,19 @@ impl Lcd {
         Ok(())
     }
 
-    pub async fn write_str(&mut self, s: &str, options: &WriteSettings) -> Result<(), LcdError> {
+    pub async fn write_str(
+        &mut self,
+        row: u8,
+        s: &str,
+        options: &WriteSettings,
+    ) -> Result<(), LcdError> {
         if options.clear {
             self.clear().await?;
             self.home().await?;
         }
         let position = self.get_str_position(s, &options.align);
-        self.set_cursor(0, position).await?;
+        self.set_cursor(row, position).await?;
 
-        // also cap how many chars we actually push, so an oversized string
-        // can't scroll past the display's DDRAM into who-knows-what
         for c in s.chars().take(self.width as usize) {
             self.write_char(c).await?;
             if let Some(delay) = options.delay_per_char {
@@ -210,8 +213,17 @@ impl Lcd {
         Ok(())
     }
 
+    pub async fn clear_row(&mut self, row: u8) -> Result<(), LcdError> {
+        self.set_cursor(row, 0).await?;
+        for _ in 0..self.width {
+            self.write_char(' ').await?;
+        }
+        self.set_cursor(row, 0).await?;
+        Ok(())
+    }
+
     pub async fn write_str_no(&mut self, s: &str) -> Result<(), LcdError> {
-        self.write_str(s, &WriteSettings::new()).await
+        self.write_str(0, s, &WriteSettings::new()).await
     }
 }
 

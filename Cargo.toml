@@ -11,7 +11,7 @@ name = "mushclim"
 path = "./src/bin/main.rs"
 
 [dependencies]
-encore = { path = "../encore" }
+
 # esp-specific
 
 esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal", rev = "e7b663af699c4b4e387dadc7e1ea0d1e89621854", features = ["esp32c6"] }
@@ -46,7 +46,7 @@ trouble-host = "0.5.1"
 sequential-storage = "7.2.0"
 
 # others
-talky = { path = "/home/soulkau/Projects/talky/talky" }
+
 driverse = { path = "/home/soulkau/Projects/driverse" }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }

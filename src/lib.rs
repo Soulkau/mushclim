@@ -33,10 +33,10 @@ impl Default for MushclimConfig {
         Self {
             // Lowest bound is 80%, comfort target bound is 88%
             humidity_threshold: 80..=90,
-            retry_count: 5,
-            max_temp_delta: 5,
-            max_humidity_delta: 10,
-            calibration_samples: 5,
+            retry_count: 10,
+            max_temp_delta: 9,
+            max_humidity_delta: 30,
+            calibration_samples: 10,
             safe_mode_sleep: 600,
             safe_humidity_duty_cycle: 60,
             exhaust_duty_cycle: 2,

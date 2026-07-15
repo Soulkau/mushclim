@@ -1,10 +1,14 @@
-use core::{convert::Infallible, fmt::Debug};
+use core::{convert::Infallible, fmt::Debug, fmt::Write};
 
 use driverse::am2301::{self, Am2301};
 use embassy_time::{Delay, Timer};
 use esp_hal::gpio::Flex;
+use heapless::String;
 
-use crate::MushclimConfig;
+use crate::{
+    MushclimConfig,
+    lcd::{Lcd, TextAlign, WriteSettings},
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum MeasurementError<E> {
@@ -76,9 +80,47 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
         }
     }
 
-    pub async fn calibrate(&mut self, config: &MushclimConfig) -> Result<(), P::Error> {
+    pub async fn calibrate(
+        &mut self,
+        config: &MushclimConfig,
+        mut lcd: Option<&mut Lcd>,
+    ) -> Result<(), P::Error> {
+        // --- nested helpers ---
+
+        async fn write_header(lcd: &mut Lcd) {
+            let _ = lcd
+                .write_str(
+                    0,
+                    "Calibrating",
+                    &WriteSettings::new().align(TextAlign::Center),
+                )
+                .await;
+        }
+
+        async fn write_status_line(lcd: &mut Lcd, done: usize, total: usize, m: &Measurements) {
+            let mut line: String<32> = String::new();
+            let _ = write!(
+                line,
+                "{}/{} T{:.0}C H{:.0}%",
+                done, total, m.temperature, m.humidity
+            );
+            let _ = lcd
+                .write_str(
+                    1,
+                    &line,
+                    &WriteSettings::new().align(TextAlign::Center).clear(false),
+                )
+                .await;
+        }
+
+        // --- main logic ---
+
         let mut successful_samples = 0;
         let mut consecutive_failures = 0;
+
+        if let Some(l) = lcd.as_mut() {
+            write_header(l).await;
+        }
 
         while successful_samples < config.calibration_samples {
             match self.get_raw_measurements() {
@@ -86,15 +128,19 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                     self.history.push(m);
                     successful_samples += 1;
                     consecutive_failures = 0;
-
                     log::info!(
-                        "Calibration sample {}/5 stored successfully. Temp: {}, Hum: {}",
+                        "Calibration sample {}/10 stored successfully. Temp: {}, Hum: {}",
                         successful_samples,
                         m.temperature,
                         m.humidity
                     );
 
-                    Timer::after_secs(10).await;
+                    if let Some(l) = lcd.as_mut() {
+                        write_status_line(l, successful_samples, config.calibration_samples, &m)
+                            .await;
+                    }
+
+                    Timer::after_secs(2).await;
                 }
                 Err(e) => {
                     consecutive_failures += 1;
@@ -103,13 +149,10 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                         consecutive_failures,
                         e
                     );
-
                     if consecutive_failures >= 5 {
                         log::error!("CRITICAL: Sensor failed 5 times in a row during calibration!");
                         return Err(e);
                     }
-
-                    // Retry quickly (2 seconds) instead of waiting the full 30 seconds
                     Timer::after_secs(2).await;
                 }
             }

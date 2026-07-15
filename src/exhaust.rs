@@ -22,9 +22,8 @@ impl<'a> ExhaustManager<'a> {
 
     pub async fn tick(&mut self) -> bool {
         let minute_in_cycle = self.minutes_elapsed % self.duty_interval;
-
-        let is_turned_on = minute_in_cycle < self.duty_cycle;
-
+        let burst_start = self.duty_interval.saturating_sub(self.duty_cycle);
+        let is_turned_on = minute_in_cycle >= burst_start;
         if is_turned_on {
             if !self.exhaust.is_on() {
                 log::info!("ExhaustManager: Starting fresh air exchange window.");
@@ -36,16 +35,21 @@ impl<'a> ExhaustManager<'a> {
             }
             self.exhaust.off();
         }
-
-        // Increment for the next loop tick
         self.minutes_elapsed += 1;
-
-        // Prevent infinite u64 growth (wrap cleanly at the interval boundary)
         if self.minutes_elapsed >= self.duty_interval {
             self.minutes_elapsed = 0;
         }
-
         is_turned_on
+    }
+
+    pub fn minutes_until_change(&self) -> u64 {
+        let minute_in_cycle = self.minutes_elapsed % self.duty_interval;
+        let burst_start = self.duty_interval.saturating_sub(self.duty_cycle);
+        if self.is_turned_on() {
+            self.duty_interval.saturating_sub(minute_in_cycle)
+        } else {
+            burst_start.saturating_sub(minute_in_cycle)
+        }
     }
 
     pub fn is_turned_on(&self) -> bool {

@@ -16,10 +16,6 @@ use embassy_executor::Spawner;
 use embassy_net::StackResources;
 use embassy_time::Timer;
 
-use encore::bluetooth::BluetoothRunner;
-use encore::mk_static;
-use encore::storage::Storage;
-
 use esp_hal::clock::CpuClock;
 
 use esp_hal::efuse::Efuse;
@@ -37,13 +33,10 @@ use heapless::String;
 use log::info;
 use mushclim::MushclimConfig;
 use mushclim::exhaust::ExhaustManager;
-use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS};
+use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS, TextAlign, WriteSettings};
 use mushclim::measurements::{
     MeasurementError, MeasurementManager, MeasurementProvider, Measurements,
 };
-
-use talky::core::id::DeviceID;
-
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     info!("Panic occurred: {}", info);
@@ -188,21 +181,21 @@ async fn main(s: Spawner) -> ! {
     */
 }
 
-fn create_device_id(sha: SHA<'static>) -> DeviceID {
-    let mac = Efuse::mac_address();
-    let mut source_data = &mac[..];
+// fn create_device_id(sha: SHA<'static>) -> DeviceID {
+//     let mac = Efuse::mac_address();
+//     let mut source_data = &mac[..];
 
-    let mut sha = Sha::new(sha);
-    let mut hasher = sha.start::<Sha256>();
-    let mut output = [0u8; 32];
+//     let mut sha = Sha::new(sha);
+//     let mut hasher = sha.start::<Sha256>();
+//     let mut output = [0u8; 32];
 
-    while !source_data.is_empty() {
-        source_data = nb::block!(hasher.update(source_data)).unwrap();
-    }
+//     while !source_data.is_empty() {
+//         source_data = nb::block!(hasher.update(source_data)).unwrap();
+//     }
 
-    hasher.finish(output.as_mut_slice()).unwrap();
-    DeviceID::new(output)
-}
+//     hasher.finish(output.as_mut_slice()).unwrap();
+//     DeviceID::new(output)
+// }
 
 struct MushclimApp<'a, P: MeasurementProvider> {
     measurement_manager: MeasurementManager<P>,
@@ -223,13 +216,22 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
 
         self.display_calibrating().await;
 
-        let Ok(_) = self.measurement_manager.calibrate(&self.config).await else {
+        let Ok(_) = self
+            .measurement_manager
+            .calibrate(&self.config, self.lcd.as_mut())
+            .await
+        else {
             log::error!("Failed to calibrate measurements");
-            self.enter_safe_mode().await
+            self.enter_safe_mode(4).await
         };
 
         loop {
             self.exhaust.tick().await;
+            self.display_fan_state(
+                self.exhaust.is_turned_on(),
+                self.exhaust.minutes_until_change(),
+            )
+            .await;
             match self.acquire_safe_measurement().await {
                 Some(stats) => {
                     self.log_current_measurements(stats);
@@ -262,7 +264,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                         "CRITICAL: Sensor totally failed or reading is permanently erratic!"
                     );
 
-                    self.enter_safe_mode().await;
+                    self.enter_safe_mode(1).await;
                 }
             }
 
@@ -290,18 +292,18 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                     Timer::after_secs(2).await;
                 }
                 Err(MeasurementError::NotCalibrated) => {
-                    self.enter_safe_mode().await;
+                    self.enter_safe_mode(3).await;
                 }
             }
         }
         None
     }
 
-    async fn enter_safe_mode(&mut self) -> ! {
+    async fn enter_safe_mode(&mut self, error_code: u32) -> ! {
         self.humidity.off();
         self.exhaust.reset();
         let mut was_exhaust_active = false;
-        self.display_safe_mode().await;
+        self.display_safe_mode(error_code).await;
         loop {
             let is_exhaust_active = self.exhaust.tick().await;
 
@@ -329,7 +331,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
 
     pub async fn display_calibrating(&mut self) {
         if let Some(lcd) = self.lcd.as_mut() {
-            let _ = lcd.set_rgb(255, 0, 0).await;
+            let _ = lcd.set_rgb(0, 255, 0).await;
             let _ = lcd.write_str_no("Calibrating").await;
         }
     }
@@ -338,15 +340,52 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         if let Some(lcd) = self.lcd.as_mut() {
             let mut line: String<32> = String::new();
             let _ = write!(line, "T:{:.1}C H:{:.0}%", stats.temperature, stats.humidity);
-            let _ = lcd.write_str_no(&line).await;
+            let _ = lcd
+                .write_str(
+                    0,
+                    &line,
+                    &WriteSettings::new().align(TextAlign::Center).clear(false),
+                )
+                .await;
+        }
+    }
+
+    pub async fn display_fan_state(&mut self, is_on: bool, minutes_until_change: u64) {
+        if let Some(lcd) = self.lcd.as_mut() {
+            let mut line: String<32> = String::new();
+            if is_on {
+                let _ = write!(line, "Fan: off in {}m", minutes_until_change);
+            } else {
+                let _ = write!(line, "Fan: on in {}m", minutes_until_change);
+            }
+            let _ = lcd.clear_row(1).await;
+            let _ = lcd
+                .write_str(
+                    1,
+                    &line,
+                    &WriteSettings::new().align(TextAlign::Center).clear(false),
+                )
+                .await;
         }
     }
 
     /// Flip the LCD into a visual "safe mode" indicator: red backlight + message.
-    pub async fn display_safe_mode(&mut self) {
+    pub async fn display_safe_mode(&mut self, error_code: u32) {
         if let Some(lcd) = self.lcd.as_mut() {
-            let _ = lcd.set_rgb(255, 0, 0).await;
-            let _ = lcd.write_str_no("Safe mode").await;
+            let _ = lcd.set_rgb(125, 0, 0).await;
+
+            let msg = match error_code {
+                1 => "Err01 Sensor",
+                2 => "Err02 Erratic",
+                3 => "Err03 NoCalib",
+                4 => "Err04 CalibFail",
+                5 => "Err05 Exhaust",
+                _ => "Err00 Unknown",
+            };
+
+            let mut line: String<32> = String::new();
+            let _ = write!(line, "{}", msg);
+            let _ = lcd.write_str_no(&line).await;
         }
     }
 
