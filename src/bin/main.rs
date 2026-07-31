@@ -33,11 +33,7 @@ use esp_storage::FlashStorage;
 use mushclim::humidifier::Humidifier;
 use mushclim::mqtt::{OUTGOING, start_mqtt};
 use mushclim::wifi::{WifiCredentials, WifiManager, WifiStorageV2};
-use rapid::bluetooth::{BluetoothHandle, BluetoothModule};
-use rapid::device::DeviceMetadata;
-use rapid::macros::{self, spawn_actor};
-use rapid::mk_storage;
-use rapid::storage::StorageModule;
+
 use sequential_storage::map::MapConfig;
 use talky::device;
 use talky::talky_devices::chest::*;
@@ -45,7 +41,6 @@ use talky::types::device::*;
 
 use defmt_rtt as _;
 use esp_backtrace as _;
-use rapid::types::{Actor, Runnable};
 
 use defmt::{Debug2Format, info};
 use heapless::String;
@@ -97,11 +92,11 @@ async fn main(spawner: Spawner) -> ! {
     let ble_controller = ExternalController::<BleConnector, 20>::new(transport);
 
     let wifi_interface = interfaces.station;
-    let storage = mk_storage!(
-        FlashStorage,
-        FlashStorage::new(peripherals.FLASH),
-        MapConfig::new(0x9000..0xF000)
-    );
+    // let storage = mk_storage!(
+    //     FlashStorage,
+    //     FlashStorage::new(peripherals.FLASH),
+    //     MapConfig::new(0x9000..0xF000)
+    // );
     // let device_meta = DeviceMetadata::load(&storage, talky::device::DeviceType::MushClimate).await;
 
     // #[allow(unused)]
