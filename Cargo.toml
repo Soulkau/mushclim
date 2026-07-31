@@ -67,7 +67,7 @@ embedded-hal = "1.0.0"
 embedded-nal-async = "0.9.0"
 esp-backtrace = { git = "https://github.com/esp-rs/esp-hal", rev = "e7b663af699c4b4e387dadc7e1ea0d1e89621854",features = ["esp32c6", "defmt"]}
 mqttrust = { git = "https://github.com/FactbirdHQ/mqttrust.git", features = ["defmt", "embedded-tls", "mqttv3"], default-features=false }
-rapid = { path = "/home/soulkau/Projects/rapid" }
+# rapid = { path = "/home/soulkau/Projects/rapid" }
 
 
 [lib]
