@@ -1,5 +1,6 @@
 use core::{convert::Infallible, fmt::Debug, fmt::Write};
 
+use defmt::Debug2Format;
 use driverse::am2301::{self, Am2301};
 use embassy_time::{Delay, Timer};
 use esp_hal::gpio::Flex;
@@ -113,7 +114,7 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                 .await;
         }
 
-        // --- main logic ---
+        // --- main defmtic ---
 
         let mut successful_samples = 0;
         let mut consecutive_failures = 0;
@@ -128,7 +129,7 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                     self.history.push(m);
                     successful_samples += 1;
                     consecutive_failures = 0;
-                    log::info!(
+                    defmt::info!(
                         "Calibration sample {}/10 stored successfully. Temp: {}, Hum: {}",
                         successful_samples,
                         m.temperature,
@@ -144,13 +145,15 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                 }
                 Err(e) => {
                     consecutive_failures += 1;
-                    log::warn!(
+                    defmt::warn!(
                         "Hardware glitched during calibration (Failure {}/5): {:?}",
                         consecutive_failures,
-                        e
+                        Debug2Format(&e)
                     );
                     if consecutive_failures >= 5 {
-                        log::error!("CRITICAL: Sensor failed 5 times in a row during calibration!");
+                        defmt::error!(
+                            "CRITICAL: Sensor failed 5 times in a row during calibration!"
+                        );
                         return Err(e);
                     }
                     Timer::after_secs(2).await;
@@ -210,11 +213,11 @@ impl<'a> MeasurementProvider for Am2301<'a, Flex<'static>> {
         })
     }
 }
-/*
+
 pub struct MockSensorProvider {
     step: usize,
     // We store a list of values to feed to the app on consecutive successful loops
-    simulated_readings: [(i16, u16); 15],
+    simulated_readings: [(i16, u16); 25],
 }
 
 impl MockSensorProvider {
@@ -222,32 +225,45 @@ impl MockSensorProvider {
         Self {
             step: 0,
             simulated_readings: [
-                // --- Calibration Phase (10 readings) ---
+                // --- Calibration Phase (10 readings, stable) ---
                 (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                (22, 84),
+                // --- Main Loop Control Phase (15 readings, 84 -> 90) ---
                 (22, 84),
                 (22, 85),
                 (22, 85),
-                (22, 84),
-                (22, 84),
-                (22, 85),
-                (22, 85),
-                (22, 84),
-                (22, 84),
-                // --- Main Loop Control Phase ---
-                (22, 78), // 11. Drops BELOW low bound (80%) -> Humidifier should turn ON
-                (22, 83), // 12. Rising, but inside comfort range (80-88) -> Should STAY ON
-                (22, 90), // 13. Exceeds comfort bound (88%) -> Should turn OFF
-                (22, 85), // 14. Falling, but inside comfort range -> Should STAY OFF
-                (22, 75), // 15. Drops below limit again -> Should turn ON
+                (22, 86),
+                (22, 86),
+                (22, 87),
+                (22, 87),
+                (22, 88),
+                (22, 88),
+                (22, 88),
+                (22, 89),
+                (22, 89),
+                (22, 89),
+                (22, 90),
+                (22, 90),
             ],
         }
     }
 }
 
 impl MeasurementProvider for MockSensorProvider {
-    type Error = core::convert::Infallible; // Mocks don't fail!
+    type Error = core::convert::Infallible; // Mocks don't fail.
 
     fn get_measurements(&mut self) -> Result<Measurements, Self::Error> {
+        if self.step >= self.simulated_readings.len() - 1 {
+            self.step = 0;
+        }
         // Grab the reading for the current step, or just loop the last reading if we run out
         let index = core::cmp::min(self.step, self.simulated_readings.len() - 1);
         let (temp, hum) = self.simulated_readings[index];
@@ -260,4 +276,3 @@ impl MeasurementProvider for MockSensorProvider {
         })
     }
 }
-*/
