@@ -1,5 +1,5 @@
 [target.riscv32imac-unknown-none-elf]
-runner = "espflash flash --monitor --chip esp32c6 --log-format defmt"
+runner = "probe-rs run --chip esp32c6"
 rustflags = [
   # --- KEEP existing `link-arg` flags ---
 
@@ -8,6 +8,7 @@ rustflags = [
 ]
 
 [env]
+DEFMT_LOG = "trace"
 
 [build]
 rustflags = [
@@ -19,4 +20,5 @@ rustflags = [
 target = "riscv32imac-unknown-none-elf"
 
 [unstable]
-build-std = ["alloc", "core"]
+build-std = ["core", "alloc", "compiler_builtins"]
+build-std-features = ["compiler-builtins-mem"]
