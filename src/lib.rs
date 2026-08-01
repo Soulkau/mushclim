@@ -55,7 +55,7 @@ impl Default for MushclimConfig {
             safe_humidity_duty_interval: Duration::from_secs(20 * 60),
             safe_humidity_duty_cycle: Duration::from_secs(4 * 60),
             exhaust_duty_cycle: Duration::from_secs(120),
-            exhaust_duty_interval: Duration::from_secs(30 * 60),
+            exhaust_duty_interval: Duration::from_secs(50 * 60),
             loop_delay: Duration::from_secs(30),
         }
     }
