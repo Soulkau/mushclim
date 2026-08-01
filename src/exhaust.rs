@@ -31,18 +31,6 @@ impl<'a> ExhaustManager<'a> {
         let dt = now - self.last_tick;
         self.last_tick = now;
 
-        if is_humidifier_on {
-            // Если увлажнитель включен - не считаем это время, "замораживаем" цикл,
-            // сдвигая cycle_start вперёд на dt, чтобы elapsed_in_cycle не менялся
-            self.cycle_start += dt;
-
-            if self.exhaust.is_on() {
-                defmt::info!("ExhaustManager: Paused, humidifier active.");
-            }
-            self.exhaust.off();
-            return false;
-        }
-
         let elapsed = now - self.cycle_start;
         //Если прошло больше либо столько же времени,как и переодичность включения, "обернуть", задать новый старт цикла.
         if elapsed >= self.duty_interval {
@@ -57,6 +45,18 @@ impl<'a> ExhaustManager<'a> {
         //Если время с начала цилка >=старту обдува
         let should_be_on = elapsed_in_cycle >= burst_start;
 
+        if is_humidifier_on && should_be_on {
+            // Если увлажнитель включен - не считаем это время, "замораживаем" цикл,
+            // сдвигая cycle_start вперёд на dt, чтобы elapsed_in_cycle не менялся
+            self.cycle_start += dt;
+
+            if self.exhaust.is_on() {
+                defmt::info!("ExhaustManager: Paused, humidifier active.");
+            }
+            self.exhaust.off();
+            return false;
+        }
+        
         if should_be_on {
             if !self.exhaust.is_on() {
                 defmt::info!("ExhaustManager: Starting fresh air exchange window.");
@@ -90,7 +90,7 @@ impl<'a> ExhaustManager<'a> {
         } else {
             let _ = string.write_str("on");
         }
-        let _ = write!(string, " in {:.1}m", until as f64 / 60.0);
+        let _ = write!(string, " in {}m", until / 60);
         string
     }
 
