@@ -88,8 +88,8 @@ impl CycleTimer {
         if remaining.as_secs() < 60 {
             let _ = write!(string, "{}s", remaining.as_secs());
         } else {
-            let minutes = remaining.as_secs() as f64 / 60.0;
-            let _ = write!(string, "{:.1}m", minutes);
+            let minutes = remaining.as_secs() / 60;
+            let _ = write!(string, "{}m", minutes);
         }
         defmt::info!("[CycleTimer]: {} left until change", string);
         string
