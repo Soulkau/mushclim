@@ -38,7 +38,7 @@ pub struct MushclimConfig {
     pub max_humidity_delta: u16,                 //Maximum humidity delta over single tick
     pub calibration_samples: usize,              //Number of calibration samples
     pub safe_humidity_duty_interval: Duration, //Interval between humidity duty cycles in safe mode
-    pub safe_humidity_duty_cycle: Duration,    //Duration of humidity duty cycle in safe mode
+    pub safe_humidity_duty: Duration,          //Duration of humidity duty cycle in safe mode
     pub exhaust_duty: Duration,                //Exhaust duty duration
     pub exhaust_duty_interval: Duration,       //Interval between exhaust duty cycles
     pub loop_delay: Duration,                  //Tick/loop frequency
@@ -52,7 +52,7 @@ impl Default for MushclimConfig {
             max_humidity_delta: 30,
             calibration_samples: 10,
             safe_humidity_duty_interval: Duration::from_secs(20 * 60),
-            safe_humidity_duty_cycle: Duration::from_secs(4 * 60),
+            safe_humidity_duty: Duration::from_secs(4 * 60),
             exhaust_duty: Duration::from_secs(120),
             exhaust_duty_interval: Duration::from_secs(50 * 60),
             loop_delay: Duration::from_secs(30),
