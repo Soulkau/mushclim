@@ -322,7 +322,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         loop {
             self.exhaust.tick().await;
 
-            let humidifier_on = if self.exhaust.is_turned_on() {
+            let humidifier_on = if self.exhaust.is_turned_on() && humidity_timer.duty_started() {
                 humidity_timer.ingore_tick();
                 if self.humidifier.is_on() {
                     defmt::info!("[SafeMode]: humidifier is on along exhaust, turning off");
