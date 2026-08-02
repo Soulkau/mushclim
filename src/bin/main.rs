@@ -30,6 +30,7 @@ use esp_println::logger::init_logger;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::WifiDevice;
 use esp_storage::FlashStorage;
+use mushclim::cycle::CycleTimer;
 use mushclim::humidifier::Humidifier;
 use mushclim::mqtt::{OUTGOING, start_mqtt};
 use mushclim::wifi::{WifiCredentials, WifiManager, WifiStorageV2};
@@ -313,28 +314,31 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         self.exhaust.reset();
         self.display_safe_mode(error_code).await;
 
-        let mut cycle_start = Instant::now();
+        let mut humidity_timer = CycleTimer::new(
+            self.config.safe_humidity_duty_interval,
+            self.config.safe_humidity_duty,
+        );
 
         loop {
             self.exhaust.tick().await;
-            let elapsed_in_cycle = Instant::now().duration_since(cycle_start);
 
-            // wrap the cycle without drift if we overshoot
-            if elapsed_in_cycle >= self.config.safe_humidity_duty_interval {
-                let overshoot = elapsed_in_cycle.as_ticks()
-                    % self.config.safe_humidity_duty_interval.as_ticks();
-                cycle_start = Instant::now() - Duration::from_ticks(overshoot);
-            }
+            let humidifier_on = if self.exhaust.is_turned_on() {
+                humidity_timer.ingore_tick();
+                if self.humidifier.is_on() {
+                    defmt::info!("[SafeMode]: humidifier is on along exhaust, turning off");
+                    self.humidifier.turn_off();
+                }
+                false
+            } else {
+                humidity_timer.tick()
+            };
 
-            let elapsed_in_cycle = Instant::now().duration_since(cycle_start);
-            let should_be_on = elapsed_in_cycle < self.config.safe_humidity_duty_cycle;
-
-            if should_be_on != self.humidifier.is_on() {
-                if should_be_on {
-                    defmt::info!("Humidifer is on");
+            if humidifier_on != self.humidifier.is_on() {
+                if humidifier_on {
+                    defmt::info!("[SafeMode]: Humidifer is on");
                     self.humidifier.turn_on();
                 } else {
-                    defmt::info!("Humidifer is off");
+                    defmt::info!("[SafeMode]: Humidifer is off");
                     self.humidifier.turn_off();
                 }
             }
