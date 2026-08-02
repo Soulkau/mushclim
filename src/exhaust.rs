@@ -16,7 +16,7 @@ impl<'a> ExhaustManager<'a> {
     pub fn new(exhaust: Relay<Output<'a>>, config: &MushclimConfig) -> Self {
         Self {
             exhaust,
-            timer: CycleTimer::new(config.exhaust_duty_interval, config.exhaust_work),
+            timer: CycleTimer::new(config.exhaust_duty_interval, config.exhaust_duty),
         }
     }
 
