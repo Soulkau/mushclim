@@ -49,6 +49,7 @@ impl CycleTimer {
 
     pub fn tick(&mut self) -> bool {
         let now = Instant::now();
+        self.last_tick = now;
         let elapsed = now - self.cycle_start;
         if elapsed >= self.interval {
             defmt::info!(
