@@ -18,7 +18,15 @@ impl<'a> Humidifier<'a> {
         }
     }
 
-    pub fn tick(&mut self, measurements: &Measurements) {
+    pub fn tick(&mut self, measurements: &Measurements, is_exhaust_on: bool) {
+        if is_exhaust_on {
+            if self.switch.is_on() {
+                defmt::info!("Humidifier: Paused, exhaust active.");
+            }
+            self.switch.off();
+            return;
+        }
+
         let current_humidity = measurements.humidity;
         let low_bound = *self.treshold.start();
         let comfort_bound = *self.treshold.end();

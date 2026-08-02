@@ -255,15 +255,16 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             defmt::error!("Failed to calibrate measurements");
             self.enter_safe_mode(4).await
         };
-
+        self.exhaust.timer.ingore_tick(); //Дропнуть первый тик, ибо время еще не пошло.
         loop {
+            self.exhaust.tick().await;
             self.display_fan_state(self.exhaust.format_state()).await;
             match self.acquire_safe_measurement().await {
                 Some(stats) => {
                     self.log_current_measurements(stats);
                     self.display_measurements(stats).await;
                     // "проверить влажность, включить полевалку если надо"
-                    self.humidifier.tick(&stats);
+                    self.humidifier.tick(&stats, self.exhaust.is_turned_on());
                 }
                 None => {
                     defmt::error!(
@@ -273,7 +274,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                     self.enter_safe_mode(1).await;
                 }
             }
-            self.exhaust.tick(self.humidifier.is_on()).await;
+
             // Sleep for 1 minute before checking everything again
             Timer::after(self.config.loop_delay).await;
         }
@@ -315,6 +316,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         let mut cycle_start = Instant::now();
 
         loop {
+            self.exhaust.tick().await;
             let elapsed_in_cycle = Instant::now().duration_since(cycle_start);
 
             // wrap the cycle without drift if we overshoot
@@ -336,8 +338,6 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                     self.humidifier.turn_off();
                 }
             }
-
-            self.exhaust.tick(self.humidifier.is_on()).await;
 
             Timer::after(self.config.loop_delay).await;
         }
