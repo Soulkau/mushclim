@@ -60,6 +60,8 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 65536);
     esp_alloc::heap_allocator!(size: 64 * 1024);
 
+    ivy::logger::init_mqtt_logger();
+
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_interrupt =
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
@@ -83,6 +85,11 @@ async fn main(spawner: Spawner) -> ! {
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
+    let creds = WifiCredentials::new("daym".try_into().unwrap(), "pass".try_into().unwrap());
+    let manager = WifiManager::new(spawner.make_send(), wifi_controller).await;
+    tracing::info!("After manager");
+    manager.connect(creds).await.expect("Error connecting");
+
     // Init network stack
     let (stack, runner) = embassy_net::new(
         wifi_interface,
@@ -90,13 +97,12 @@ async fn main(spawner: Spawner) -> ! {
         mk_static!(StackResources<3>, StackResources::<3>::new()),
         seed,
     );
+    spawner.must_spawn(net_task(runner));
+    let _ = TrngSource::new(peripherals.RNG, peripherals.ADC1);
+    let trng = Trng::try_new().unwrap();
 
-    // let mut password = String::new();
-    // let _ = password.write_str("***REMOVED***");
-    // let mut ssid = String::new();
-    // let _ = ssid.write_str("***REMOVED***");
-    // info!("Ssid: {}, Password: {}", ssid, password);
-    // let creds = WifiCredentials::new(ssid, password);
+    let mqtt = MqttModule::new(stack, trng);
+    spawner.must_spawn(mqtt_task(mqtt));
 
     let mut out = Output::new(
         peripherals.GPIO4,
@@ -366,6 +372,13 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             stats.temperature,
             stats.humidity
         );
+    }
+}
+
+#[embassy_executor::task]
+pub async fn mqtt_task(mut mqtt: MqttModule<Trng>) {
+    loop {
+        mqtt.run().await;
     }
 }
 
