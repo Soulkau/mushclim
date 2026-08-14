@@ -94,3 +94,29 @@ impl CycleTimer {
         string
     }
 }
+
+pub struct DueTimer {
+    interval: Duration,
+    next_due: Instant,
+}
+
+impl DueTimer {
+    pub fn new(interval: Duration) -> Self {
+        Self {
+            interval,
+            next_due: Instant::now() + interval,
+        }
+    }
+
+    pub fn due(&mut self) -> bool {
+        let now = Instant::now();
+        if now < self.next_due {
+            return false;
+        }
+        self.next_due += self.interval;
+        if self.next_due <= now {
+            self.next_due = now + self.interval;
+        }
+        true
+    }
+}

@@ -4,7 +4,7 @@ use driverse::relay::Relay;
 use esp_hal::gpio::Output;
 use heapless::String;
 
-use crate::{MushclimConfig, cycle::CycleTimer};
+use crate::{MushclimConfig, timer::CycleTimer};
 
 pub struct ExhaustManager<'a> {
     pub exhaust: Relay<Output<'a>>,
