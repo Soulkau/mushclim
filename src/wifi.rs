@@ -12,8 +12,8 @@ use esp_radio::wifi::{
 };
 use esp_storage::FlashStorage;
 use heapless::String;
-use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
+use tracing::{error, info, warn};
 
 static WIFI_CREDS: Mutex<CriticalSectionRawMutex, Option<WifiCredentials>> = Mutex::new(None);
 
@@ -176,7 +176,6 @@ async fn connect_to_wifi(controller: &mut WifiController<'static>) -> Result<(),
                     .with_password(creds.password.to_string()),
             )
         };
-
         controller.set_config(&client_config).unwrap();
         info!("Starting Wi-Fi with current credentials...");
 
@@ -205,7 +204,7 @@ async fn connect_to_wifi_with_retries(
             Err(e) => {
                 warn!(
                     "Wi-Fi connect attempt {}/{} failed: {}",
-                    attempt, max_attempts, e
+                    attempt, max_attempts, &e
                 );
                 last_err = Some(e);
                 if attempt < max_attempts {
@@ -223,7 +222,6 @@ async fn connect_to_wifi_with_retries(
 #[embassy_executor::task]
 pub async fn connection(mut controller: WifiController<'static>) {
     info!("Start connection task");
-    info!("Device capabilities: {:?}", controller.ap_info());
 
     loop {
         let command = WIFI_CONTROLLER_COMMAND_CHANNEL.receive();
@@ -240,7 +238,7 @@ pub async fn connection(mut controller: WifiController<'static>) {
 
                     let result = self::connect_to_wifi_with_retries(&mut controller, 3).await;
                     let outcome = result.map(|_| ()).map_err(|e| {
-                        warn!("Failed connect to wifi after retries: {}", e);
+                        warn!("Failed connect to wifi after retries: {}", &e);
                     });
 
                     response_consumer.send(outcome).unwrap_or_else(|_| {
@@ -271,7 +269,7 @@ pub async fn connection(mut controller: WifiController<'static>) {
                 self::connect_to_wifi_with_retries(&mut controller, 3)
                     .await
                     .unwrap_or_else(|e| {
-                        warn!("Failed connect to wifi after retries: {}", e);
+                        warn!("Failed connect to wifi after retries: {}", &e);
                     });
             }
         };

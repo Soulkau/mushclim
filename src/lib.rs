@@ -8,7 +8,6 @@ pub mod exhaust;
 pub mod humidifier;
 pub mod lcd;
 pub mod measurements;
-pub mod mqtt;
 
 pub mod wifi;
 extern crate alloc;

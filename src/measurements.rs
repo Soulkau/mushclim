@@ -1,6 +1,5 @@
 use core::{convert::Infallible, fmt::Debug, fmt::Write};
 
-use defmt::Debug2Format;
 use driverse::am2301::{self, Am2301};
 use embassy_time::{Delay, Timer};
 use esp_hal::gpio::Flex;
@@ -114,7 +113,7 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                 .await;
         }
 
-        // --- main defmtic ---
+        // --- main tracingic ---
 
         let mut successful_samples = 0;
         let mut consecutive_failures = 0;
@@ -129,7 +128,7 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                     self.history.push(m);
                     successful_samples += 1;
                     consecutive_failures = 0;
-                    defmt::info!(
+                    tracing::info!(
                         "Calibration sample {}/10 stored successfully. Temp: {}, Hum: {}",
                         successful_samples,
                         m.temperature,
@@ -145,13 +144,13 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                 }
                 Err(e) => {
                     consecutive_failures += 1;
-                    defmt::warn!(
+                    tracing::warn!(
                         "Hardware glitched during calibration (Failure {}/5): {:?}",
                         consecutive_failures,
-                        Debug2Format(&e)
+                        &e
                     );
                     if consecutive_failures >= 5 {
-                        defmt::error!(
+                        tracing::error!(
                             "CRITICAL: Sensor failed 5 times in a row during calibration!"
                         );
                         return Err(e);

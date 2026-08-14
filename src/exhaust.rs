@@ -1,7 +1,6 @@
-use core::{fmt::Write, ops::Sub};
+use core::fmt::Write;
 
 use driverse::relay::Relay;
-use embassy_time::{Duration, Instant};
 use esp_hal::gpio::Output;
 use heapless::String;
 
@@ -25,12 +24,12 @@ impl<'a> ExhaustManager<'a> {
 
         if should_be_on {
             if !self.exhaust.is_on() {
-                defmt::info!("ExhaustManager: Starting fresh air exchange window.");
+                tracing::info!("ExhaustManager: Starting fresh air exchange window.");
             }
             self.exhaust.on();
         } else {
             if self.exhaust.is_on() {
-                defmt::info!("ExhaustManager: Ending fresh air exchange window.");
+                tracing::info!("ExhaustManager: Ending fresh air exchange window.");
             }
             self.exhaust.off();
         }
