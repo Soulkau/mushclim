@@ -3,12 +3,12 @@
 use core::ops::RangeInclusive;
 use embassy_time::Duration;
 
-pub mod cycle;
 pub mod exhaust;
 pub mod humidifier;
 pub mod lcd;
 pub mod measurements;
-
+pub mod metrics;
+pub mod timer;
 pub mod wifi;
 extern crate alloc;
 
@@ -30,6 +30,8 @@ macro_rules! mk_static {
     }};
 }
 
+pub const METRIC_SNAPSHOT_AMOUNT: usize = 10;
+
 pub struct MushclimConfig {
     pub humidity_threshold: RangeInclusive<u16>, //Humidity threshold, lower 86% - upper 90%
     pub retry_count: usize,                      //Retry count on any error
@@ -41,6 +43,7 @@ pub struct MushclimConfig {
     pub exhaust_duty: Duration,                //Exhaust duty duration
     pub exhaust_duty_interval: Duration,       //Interval between exhaust duty cycles
     pub loop_delay: Duration,                  //Tick/loop frequency
+    pub metric_send_period: Duration,
 }
 impl Default for MushclimConfig {
     fn default() -> Self {
@@ -55,6 +58,7 @@ impl Default for MushclimConfig {
             exhaust_duty: Duration::from_secs(120),
             exhaust_duty_interval: Duration::from_secs(50 * 60),
             loop_delay: Duration::from_secs(30),
+            metric_send_period: Duration::from_secs(3600),
         }
     }
 }

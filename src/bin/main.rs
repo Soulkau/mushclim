@@ -23,8 +23,9 @@ use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::WifiDevice;
 use ivy::logger::{self, SendLogger};
 use ivy::mqtt::MqttModule;
-use mushclim::cycle::CycleTimer;
 use mushclim::humidifier::Humidifier;
+use mushclim::metrics::MetricManager;
+use mushclim::timer::CycleTimer;
 use mushclim::wifi::{WifiCredentials, WifiManager};
 
 use esp_backtrace as _;
@@ -66,7 +67,7 @@ async fn main(spawner: Spawner) -> ! {
     let sw_interrupt =
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
-    tracing::info!("It is running");
+    tracing::info!("Mushclim booted");
     // Wi-Fi and Bluetooth hardware init
     let (wifi_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())
         .expect("Failed to initialize Wi-Fi controller");
@@ -138,10 +139,11 @@ async fn main(spawner: Spawner) -> ! {
 
     let lights = create_relay!(peripherals.GPIO0); //Those all are on by default
 
-    let measurement_manager = MeasurementManager::new(MockSensorProvider::new());
+    let measurement_manager = MeasurementManager::new(am2301);
     let config = MushclimConfig::default();
     let exhaust = ExhaustManager::new(fan, &config);
     let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
+    let metrics = MetricManager::new(&config);
     let mut mushclim: MushclimApp<'static, _> = MushclimApp {
         lcd,
         config,
@@ -150,8 +152,9 @@ async fn main(spawner: Spawner) -> ! {
         humidifier,
         disco,
         exhaust,
+        metrics,
     };
-
+    tracing::info!("Mushclim app was built and running!");
     mushclim.run().await
     /*  CUSTOM APP INITIALIZATION PLACEHOLDER ---
     let app = todo!("Initialize your custom App structure here wrapped in mk_static!");
@@ -202,6 +205,7 @@ struct MushclimApp<'a, P: MeasurementProvider> {
     lights: Relay<Output<'a>>,
     humidifier: Humidifier<'a>,
     disco: Relay<Output<'a>>,
+    metrics: MetricManager,
 }
 
 impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
@@ -227,11 +231,13 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             self.exhaust.tick().await;
             self.display_fan_state(self.exhaust.format_state()).await;
             match self.acquire_safe_measurement().await {
-                Some(stats) => {
-                    self.log_current_measurements(stats);
-                    self.display_measurements(stats).await;
+                Some(measurments) => {
+                    self.metrics.feed(measurments);
+                    self.log_current_measurements(measurments);
+                    self.display_measurements(measurments).await;
                     // "проверить влажность, включить полевалку если надо"
-                    self.humidifier.tick(&stats, self.exhaust.is_turned_on());
+                    self.humidifier
+                        .tick(&measurments, self.exhaust.is_turned_on());
                 }
                 None => {
                     tracing::error!(
