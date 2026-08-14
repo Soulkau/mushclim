@@ -7,7 +7,8 @@ rustflags = [
 ]
 
 [env]
-DEFMT_LOG = "trace"
+NATS_PASS="pss"
+NATS_USER="usr"
 
 [build]
 rustflags = [
