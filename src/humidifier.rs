@@ -21,7 +21,7 @@ impl<'a> Humidifier<'a> {
     pub fn tick(&mut self, measurements: &Measurements, is_exhaust_on: bool) {
         if is_exhaust_on {
             if self.switch.is_on() {
-                defmt::info!("Humidifier: Paused, exhaust active.");
+                tracing::info!("Humidifier: Paused, exhaust active.");
             }
             self.switch.off();
             return;
@@ -33,7 +33,7 @@ impl<'a> Humidifier<'a> {
 
         if current_humidity <= low_bound {
             if !self.switch.is_on() {
-                defmt::info!(
+                tracing::info!(
                     "Humidity ({}%) below low bound ({}%). Turning humidifier ON.",
                     current_humidity,
                     low_bound
@@ -42,7 +42,7 @@ impl<'a> Humidifier<'a> {
             }
         } else if current_humidity >= comfort_bound {
             if self.switch.is_on() {
-                defmt::info!(
+                tracing::info!(
                     "Humidity ({}%) reached comfort bound ({}%). Turning humidifier OFF.",
                     current_humidity,
                     comfort_bound

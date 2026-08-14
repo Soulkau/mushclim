@@ -1,10 +1,9 @@
 [target.riscv32imac-unknown-none-elf]
-runner = "probe-rs run --chip esp32c6"
+runner = "espflash flash --monitor --chip esp32c6"
 rustflags = [
   # --- KEEP existing `link-arg` flags ---
 
-  # --- ADD following new flag ---
-  "-C", "link-arg=-Tdefmt.x",
+
 ]
 
 [env]

@@ -1,6 +1,5 @@
 use core::{fmt::Write, ops::Sub};
 
-use defmt::Debug2Format;
 use embassy_time::{Duration, Instant};
 use heapless::String;
 
@@ -26,7 +25,7 @@ impl CycleTimer {
         let dt = now - self.last_tick;
         self.last_tick = now;
         self.cycle_start += dt;
-        defmt::info!("[CycleTimer]: ignored tick for {}", Debug2Format(&dt))
+        tracing::info!("[CycleTimer]: ignored tick for {}", &dt)
     }
 
     fn elapsed_wrapped(&self) -> Duration {
@@ -52,14 +51,14 @@ impl CycleTimer {
         self.last_tick = now;
         let elapsed = now - self.cycle_start;
         if elapsed >= self.interval {
-            defmt::info!(
+            tracing::info!(
                 "[CycleTimer]: cycle has ended, wrapping around {}",
-                Debug2Format(&elapsed)
+                &elapsed
             );
             let overshoot = elapsed.as_ticks() % self.interval.as_ticks();
             self.cycle_start = now - Duration::from_ticks(overshoot);
         }
-        defmt::info!("[CycleTimer]: ticked successfully");
+        tracing::info!("[CycleTimer]: ticked successfully");
         self.elapsed_wrapped() >= self.burst_start()
     }
 
@@ -91,7 +90,7 @@ impl CycleTimer {
             let minutes = remaining.as_secs() / 60;
             let _ = write!(string, "{}m", minutes);
         }
-        defmt::info!("[CycleTimer]: {} left until change", string);
+        tracing::info!("[CycleTimer]: {} left until change", string);
         string
     }
 }

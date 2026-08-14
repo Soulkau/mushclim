@@ -7,43 +7,28 @@
 )]
 
 extern crate alloc;
-use alloc::string::{String as AString, ToString};
 use bt_hci::controller::ExternalController;
 use core::fmt::Write;
 use driverse::am2301::Am2301;
 use driverse::relay::Relay;
 use embassy_executor::Spawner;
-use embassy_futures::select::select;
 use embassy_net::{Runner, StackResources};
-use embassy_time::{Duration, Instant, Timer};
-use embedded_storage::nor_flash::ReadNorFlash;
-use esp_bootloader_esp_idf::partitions::{self, PartitionEntry};
+use embassy_time::{Ticker, Timer};
 use esp_hal::clock::CpuClock;
-use esp_hal::efuse::Efuse;
 use esp_hal::gpio::{Output, OutputConfig};
 use esp_hal::i2c::master::{Config, I2c};
-use esp_hal::peripherals::SHA;
-use esp_hal::rng::Rng;
-use esp_hal::sha::{Sha, Sha256};
+use esp_hal::rng::{Rng, Trng, TrngSource};
 use esp_hal::timer::timg::TimerGroup;
-use esp_println::logger::init_logger;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::WifiDevice;
-use esp_storage::FlashStorage;
+use ivy::logger::{self, SendLogger};
+use ivy::mqtt::MqttModule;
 use mushclim::cycle::CycleTimer;
 use mushclim::humidifier::Humidifier;
-use mushclim::mqtt::{OUTGOING, start_mqtt};
-use mushclim::wifi::{WifiCredentials, WifiManager, WifiStorageV2};
+use mushclim::wifi::{WifiCredentials, WifiManager};
 
-use sequential_storage::map::MapConfig;
-use talky::device;
-use talky::talky_devices::chest::*;
-use talky::types::device::*;
-
-use defmt_rtt as _;
 use esp_backtrace as _;
 
-use defmt::{Debug2Format, info};
 use heapless::String;
 use mushclim::exhaust::ExhaustManager;
 use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS, TextAlign, WriteSettings};
@@ -51,12 +36,7 @@ use mushclim::measurements::{
     MeasurementError, MeasurementManager, MeasurementProvider, Measurements, MockSensorProvider,
 };
 use mushclim::{MushclimConfig, mk_static};
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    info!("Panic occurred: {}", info);
-    loop {}
-}
-
+use tracing::{Dispatch, Level, info};
 macro_rules! create_relay {
     ($pin:expr) => {
         Relay::new(
@@ -75,7 +55,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
-
+    // esp_println::logger::init_logger(log::LevelFilter::Debug);
     // Allocate Heap for Radio/COEX
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 65536);
     esp_alloc::heap_allocator!(size: 64 * 1024);
@@ -84,7 +64,7 @@ async fn main(spawner: Spawner) -> ! {
     let sw_interrupt =
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
-    defmt::info!("It is running");
+    tracing::info!("It is running");
     // Wi-Fi and Bluetooth hardware init
     let (wifi_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())
         .expect("Failed to initialize Wi-Fi controller");
@@ -100,13 +80,7 @@ async fn main(spawner: Spawner) -> ! {
     // );
     // let device_meta = DeviceMetadata::load(&storage, talky::device::DeviceType::MushClimate).await;
 
-    // #[allow(unused)]
-    // let bluetooth_handle: BluetoothHandle = spawn_actor!(
-    //     spawner,
-    //     BluetoothModule<ExternalController<BleConnector<'static>, 20>>,
-    //     BluetoothModule::new(ble_controller, device_meta)
-    // );
-    let mut rng = Rng::new();
+    let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
@@ -124,24 +98,6 @@ async fn main(spawner: Spawner) -> ! {
     // info!("Ssid: {}, Password: {}", ssid, password);
     // let creds = WifiCredentials::new(ssid, password);
 
-    // let manager = WifiManager::new(spawner.make_send(), wifi_controller).await;
-    // manager.connect(creds).await.expect("Error connecting");
-    // spawner.must_spawn(net_task(runner));
-
-    /*
-    // Storage and Flash setup
-    let flash: FlashStorage<'static> = FlashStorage::new(peripherals.FLASH);
-    let storage = mk_static!(
-        Storage<FlashStorage<'static>>,
-        Storage::new(flash, MapConfig::new(0x9000..0xF000))
-    );
-
-    let bluetooth_runner = BluetoothRunner::new(
-        ble_controller,
-        Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]),
-    );
-
-    */
     let mut out = Output::new(
         peripherals.GPIO4,
         esp_hal::gpio::Level::Low,
@@ -152,7 +108,7 @@ async fn main(spawner: Spawner) -> ! {
     let am2301 = Am2301::new(out);
     let lcd: Option<Lcd> = match I2c::new(peripherals.I2C0, Config::default()) {
         Ok(i2c) => {
-            defmt::info!("Here");
+            tracing::info!("Here");
             let mut lcd = Lcd::new(
                 i2c.with_scl(peripherals.GPIO23)
                     .with_sda(peripherals.GPIO22)
@@ -160,7 +116,7 @@ async fn main(spawner: Spawner) -> ! {
                 LCD_ADDRESS,
                 RGB_ADDRESS,
             );
-            defmt::info!("LCD initialized");
+            tracing::info!("LCD initialized");
             match lcd.init().await {
                 Ok(()) => Some(lcd),
                 Err(_) => None,
@@ -173,7 +129,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let lights = create_relay!(peripherals.GPIO0); //Those all are on by default
 
-    let measurement_manager = MeasurementManager::new(am2301);
+    let measurement_manager = MeasurementManager::new(MockSensorProvider::new());
     let config = MushclimConfig::default();
     let exhaust = ExhaustManager::new(fan, &config);
     let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
@@ -192,15 +148,15 @@ async fn main(spawner: Spawner) -> ! {
     let app = todo!("Initialize your custom App structure here wrapped in mk_static!");
 
     let device_id = create_device_id(peripherals.SHA);
-    defmt::info!("{device_id:?}");
+    tracing::info!("{device_id:?}");
 
     storage.save_master_key(&test_signing_key()).await;
 
     let encore = Encore::new(storage, app, bluetooth_runner, "Chest", device_id).await;
 
     let master = storage.load_master_key().await;
-    defmt::info!("{master:?}");
-    defmt::info!("Encore created");
+    tracing::info!("{master:?}");
+    tracing::info!("Encore created");
 
     let main_loop = async {
         loop {
@@ -244,7 +200,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         self.lights.on();
         self.disco.on();
 
-        defmt::info!("Starting sensor calibration");
+        tracing::info!("Starting sensor calibration");
 
         self.display_calibrating().await;
 
@@ -253,9 +209,10 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             .calibrate(&self.config, self.lcd.as_mut())
             .await
         else {
-            defmt::error!("Failed to calibrate measurements");
+            tracing::error!("Failed to calibrate measurements");
             self.enter_safe_mode(4).await
         };
+        let mut ticker = Ticker::every(self.config.loop_delay);
         self.exhaust.timer.ingore_tick(); //Дропнуть первый тик, ибо время еще не пошло.
         loop {
             self.exhaust.tick().await;
@@ -268,7 +225,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                     self.humidifier.tick(&stats, self.exhaust.is_turned_on());
                 }
                 None => {
-                    defmt::error!(
+                    tracing::error!(
                         "CRITICAL: Sensor totally failed or reading is permanently erratic!"
                     );
 
@@ -277,7 +234,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             }
 
             // Sleep for 1 minute before checking everything again
-            Timer::after(self.config.loop_delay).await;
+            ticker.next().await;
         }
     }
 
@@ -291,12 +248,12 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                 }
                 Err(MeasurementError::SensorDriver(_e)) => {
                     // "Замерить датчик -> err -> попробовать еще раз (5 попыток)"
-                    defmt::warn!("Hardware read error on attempt {}. Retrying...", attempt);
+                    tracing::warn!("Hardware read error on attempt {}. Retrying...", attempt);
                     Timer::after_secs(2).await;
                 }
                 Err(MeasurementError::ErraticReading) => {
                     // "сверить новое измерение с историей -> err -> повторить замер и сравнить (5 раз)"
-                    defmt::warn!("Spike detected on attempt {}. Re-measuring...", attempt);
+                    tracing::warn!("Spike detected on attempt {}. Re-measuring...", attempt);
                     Timer::after_secs(2).await;
                 }
                 Err(MeasurementError::NotCalibrated) => {
@@ -308,7 +265,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     }
 
     async fn enter_safe_mode(&mut self, error_code: u32) -> ! {
-        defmt::error!("Entering safe mode");
+        tracing::error!("Entering safe mode");
 
         self.humidifier.turn_off();
         self.exhaust.reset();
@@ -325,7 +282,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             let humidifier_on = if self.exhaust.is_turned_on() && humidity_timer.duty_started() {
                 humidity_timer.ingore_tick();
                 if self.humidifier.is_on() {
-                    defmt::info!("[SafeMode]: humidifier is on along exhaust, turning off");
+                    tracing::info!("[SafeMode]: humidifier is on along exhaust, turning off");
                     self.humidifier.turn_off();
                 }
                 false
@@ -335,10 +292,10 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
 
             if humidifier_on != self.humidifier.is_on() {
                 if humidifier_on {
-                    defmt::info!("[SafeMode]: Humidifer is on");
+                    tracing::info!("[SafeMode]: Humidifer is on");
                     self.humidifier.turn_on();
                 } else {
-                    defmt::info!("[SafeMode]: Humidifer is off");
+                    tracing::info!("[SafeMode]: Humidifer is off");
                     self.humidifier.turn_off();
                 }
             }
@@ -369,7 +326,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     }
 
     pub async fn display_fan_state(&mut self, line: String<16>) {
-        defmt::info!("fan state: {}", line);
+        tracing::info!("fan state: {}", line);
         if let Some(lcd) = self.lcd.as_mut() {
             let _ = lcd.clear_row(1).await;
             let _ = lcd
@@ -404,7 +361,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
 
     /// Helper to grab measurements and dump them to the logger
     fn log_current_measurements(&mut self, stats: Measurements) {
-        defmt::info!(
+        tracing::info!(
             "Current Stats -> Temp: {}°C, Humidity: {}%",
             stats.temperature,
             stats.humidity
