@@ -85,7 +85,10 @@ async fn main(spawner: Spawner) -> ! {
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-    let creds = WifiCredentials::new("daym".try_into().unwrap(), "pass".try_into().unwrap());
+    let creds = WifiCredentials::new(
+        env!("WIFI_SSID").try_into().unwrap(),
+        env!("WIFI_PASS").try_into().unwrap(),
+    );
     let manager = WifiManager::new(spawner.make_send(), wifi_controller).await;
     tracing::info!("After manager");
     manager.connect(creds).await.expect("Error connecting");
