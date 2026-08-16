@@ -1,13 +1,8 @@
-use crate::{
-    METRIC_SNAPSHOT_AMOUNT, MushclimConfig,
-    measurements::{self, Measurements},
-    timer::DueTimer,
-};
+use crate::{METRIC_SNAPSHOT_AMOUNT, MushclimConfig, measurements::Measurements, timer::DueTimer};
 use core::fmt::Write;
-use embassy_time::{Duration, Instant};
+use embassy_time::Instant;
 use heapless::{HistoryBuf, String};
 use talky::types::logs::LOG_SIZE;
-use talky::{logs::DeviceLog, talky_devices};
 #[derive(Clone, Copy)]
 pub struct Metric {
     pub uptime_secs: u64, // when this period *ended*, relative to boot

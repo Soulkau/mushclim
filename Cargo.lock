@@ -1757,6 +1757,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "ivy"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?tag=v0.1#40af6b0c3c17a6d291bd5a4c9569b9cc79039e9c"
 dependencies = [
  "ivy-core",
  "ivy-macros",
@@ -1766,6 +1767,7 @@ dependencies = [
 [[package]]
 name = "ivy-core"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?tag=v0.1#40af6b0c3c17a6d291bd5a4c9569b9cc79039e9c"
 dependencies = [
  "bbqueue",
  "bt-hci",
@@ -1798,6 +1800,7 @@ dependencies = [
 [[package]]
 name = "ivy-macros"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?tag=v0.1#40af6b0c3c17a6d291bd5a4c9569b9cc79039e9c"
 dependencies = [
  "embassy-executor",
  "heck",
@@ -1811,6 +1814,7 @@ dependencies = [
 [[package]]
 name = "ivy-types"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?tag=v0.1#40af6b0c3c17a6d291bd5a4c9569b9cc79039e9c"
 dependencies = [
  "embassy-executor",
  "embassy-sync 0.7.2",
@@ -1972,6 +1976,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "mqttrust"
 version = "1.0.0"
+source = "git+https://github.com/Soulkau/mqttrust.git#e2e24321ad074e232c7ea30bdb998433f9b4ffdf"
 dependencies = [
  "bon",
  "embassy-futures",
@@ -2834,6 +2839,7 @@ dependencies = [
 [[package]]
 name = "talky"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
 dependencies = [
  "talky-core",
  "talky-devices",
@@ -2844,6 +2850,7 @@ dependencies = [
 [[package]]
 name = "talky-core"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2873,6 +2880,7 @@ dependencies = [
 [[package]]
 name = "talky-devices"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2902,6 +2910,7 @@ dependencies = [
 [[package]]
 name = "talky-macros"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
 dependencies = [
  "heck",
  "log",
@@ -2914,6 +2923,7 @@ dependencies = [
 [[package]]
 name = "talky-types"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
 dependencies = [
  "heapless 0.9.3",
  "serde",

@@ -34,10 +34,10 @@ use heapless::String;
 use mushclim::exhaust::ExhaustManager;
 use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS, TextAlign, WriteSettings};
 use mushclim::measurements::{
-    MeasurementError, MeasurementManager, MeasurementProvider, Measurements, MockSensorProvider,
+    MeasurementError, MeasurementManager, MeasurementProvider, Measurements,
 };
 use mushclim::{MushclimConfig, mk_static};
-use tracing::{Dispatch, Level, info};
+
 macro_rules! create_relay {
     ($pin:expr) => {
         Relay::new(
