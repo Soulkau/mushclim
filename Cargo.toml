@@ -11,8 +11,8 @@ name = "mushclim"
 path = "./src/bin/main.rs"
 
 [dependencies]
-ivy = {path = "../ivy"}
-talky = {path = "../talky", features = ["devices", "macros"]}
+ivy = {git = "https://github.com/Soulkau/Ivy.git", tag = "v0.1"}
+talky = {git = "https://github.com/Soulkau/Talky.git", tag="v0.1" , features = ["devices", "macros"]}
 # esp-specific
 
 esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal", rev = "e7b663af699c4b4e387dadc7e1ea0d1e89621854", features = ["esp32c6"] }
