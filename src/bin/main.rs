@@ -144,7 +144,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let measurement_manager = MeasurementManager::new(am2301);
     let config = MushclimConfig::default();
-    let exhaust = ExhaustManager::new(fan, &config);
+    let exhaust = ExhaustManager::new(fan, &config, mqtt_handle.clone());
     let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
     let metrics = MetricManager::new(&config);
     let mut mushclim: MushclimApp<'static, _> = MushclimApp {
@@ -261,11 +261,11 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
 
     async fn tick_step(&mut self) {
         self.exhaust.tick().await;
-        self.display_fan_state(self.exhaust.format_state()).await;
+        self.display_fan_state(self.exhaust.log_state()).await;
 
         match self.acquire_safe_measurement().await {
             Some(measurements) => {
-                self.metrics.feed(measurements);
+                self.metrics.feed(measurements, &self.mqtt_handle).await;
                 self.log_current_measurements(measurements).await;
                 self.display_measurements(measurements).await;
                 self.humidifier

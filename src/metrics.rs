@@ -2,8 +2,10 @@ use crate::{METRIC_SNAPSHOT_AMOUNT, MushclimConfig, measurements::Measurements, 
 use core::fmt::Write;
 use embassy_time::Instant;
 use heapless::{HistoryBuf, String};
+use ivy::mqtt::MqttHandle;
+use serde::{Deserialize, Serialize};
 use talky::types::logs::LOG_SIZE;
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Deserialize, Serialize)]
 pub struct Metric {
     pub uptime_secs: u64, // when this period *ended*, relative to boot
     pub temp_min: f32,
@@ -80,7 +82,7 @@ impl MetricManager {
         }
     }
 
-    pub fn feed(&mut self, measurements: Measurements) {
+    pub async fn feed(&mut self, measurements: Measurements, handle: &MqttHandle<255>) {
         self.unfinished.record(
             measurements.temperature as f32,
             measurements.humidity as f32,
@@ -92,6 +94,7 @@ impl MetricManager {
 
         if self.unfinished.started_at.elapsed().as_secs() >= 1 {
             let finished = self.unfinished.finish();
+            let _ = handle.publish("mushclim/metrics", finished).await;
             tracing::error!("{}", format_metric(&finished));
             self.cache.write(finished);
             self.unfinished = UnfinishedMetric::new();
