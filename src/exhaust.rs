@@ -24,12 +24,12 @@ impl<'a> ExhaustManager<'a> {
 
         if should_be_on {
             if !self.exhaust.is_on() {
-                tracing::info!("ExhaustManager: Starting fresh air exchange window.");
+                tracing::info!("[Exhaust]: Turned on");
             }
             self.exhaust.on();
         } else {
             if self.exhaust.is_on() {
-                tracing::info!("ExhaustManager: Ending fresh air exchange window.");
+                tracing::info!("[Exhaust]: Turned off");
             }
             self.exhaust.off();
         }
@@ -51,6 +51,10 @@ impl<'a> ExhaustManager<'a> {
 
     pub fn is_turned_on(&self) -> bool {
         self.exhaust.is_on()
+    }
+
+    pub fn force_config(&mut self, config: &MushclimConfig) {
+        self.timer = CycleTimer::new(config.exhaust_duty_interval, config.exhaust_duty);
     }
 
     pub fn reset(&mut self) {
