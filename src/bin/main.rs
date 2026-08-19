@@ -23,13 +23,11 @@ use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::WifiDevice;
 use ivy::count;
 use ivy::declare_topics;
-use ivy::mqtt::{MqttModule, Subscription};
+use ivy::mqtt::{MqttHandle, MqttModule, Subscription};
 use mushclim::humidifier::Humidifier;
 use mushclim::metrics::MetricManager;
 use mushclim::timer::CycleTimer;
-use mushclim::wifi::{WifiCredentials, WifiManager};
-
-use esp_backtrace as _;
+use mushclim::wifi::{WifiCredentials, wifi_task};
 
 use heapless::String;
 use mushclim::exhaust::ExhaustManager;
@@ -157,6 +155,7 @@ async fn main(spawner: Spawner) -> ! {
         exhaust,
         metrics,
         config_sub,
+        mqtt_handle,
     };
     tracing::info!("Mushclim app was built and running!");
     mushclim.run().await
@@ -211,6 +210,7 @@ struct MushclimApp<'a, P: MeasurementProvider> {
     disco: Relay<Output<'a>>,
     metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
+    mqtt_handle: MqttHandle<255>,
 }
 
 impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
@@ -264,7 +264,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         match self.acquire_safe_measurement().await {
             Some(measurements) => {
                 self.metrics.feed(measurements);
-                self.log_current_measurements(measurements);
+                self.log_current_measurements(measurements).await;
                 self.display_measurements(measurements).await;
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
@@ -400,7 +400,10 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     }
 
     /// Helper to grab measurements and dump them to the logger
-    fn log_current_measurements(&mut self, stats: Measurements) {
+    async fn log_current_measurements(&mut self, stats: Measurements) {
+        self.mqtt_handle
+            .publish("mushclim/measurements", stats)
+            .await;
         tracing::info!(
             "[MushclimApp] Temp: {}°C, Humidity: {}%",
             stats.temperature,
