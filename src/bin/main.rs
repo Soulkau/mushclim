@@ -21,8 +21,9 @@ use esp_hal::rng::{Rng, Trng, TrngSource};
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::WifiDevice;
-use ivy::logger::{self, SendLogger};
-use ivy::mqtt::MqttModule;
+use ivy::count;
+use ivy::declare_topics;
+use ivy::mqtt::{MqttModule, Subscription};
 use mushclim::humidifier::Humidifier;
 use mushclim::metrics::MetricManager;
 use mushclim::timer::CycleTimer;
@@ -36,7 +37,7 @@ use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS, TextAlign, WriteSettings};
 use mushclim::measurements::{
     MeasurementError, MeasurementManager, MeasurementProvider, Measurements,
 };
-use mushclim::{MushclimConfig, mk_static};
+use mushclim::{MushclimConfig, MushclimConfigDto, mk_static};
 
 macro_rules! create_relay {
     ($pin:expr) => {
@@ -101,12 +102,16 @@ async fn main(spawner: Spawner) -> ! {
         mk_static!(StackResources<3>, StackResources::<3>::new()),
         seed,
     );
+
     spawner.must_spawn(net_task(runner));
     let _ = TrngSource::new(peripherals.RNG, peripherals.ADC1);
     let trng = Trng::try_new().unwrap();
-
-    let mqtt = MqttModule::new(stack, trng);
-    spawner.must_spawn(mqtt_task(mqtt));
+    let (handles, config_sub) = declare_topics! {
+        config => "mushclim/config" : MushclimConfigDto
+    };
+    let config_sub = config_sub.0;
+    let mqtt_handle =
+        ivy::actor!(spawner, MqttModule<Trng, 255, 1>, MqttModule::new(stack, trng, handles));
 
     let mut out = Output::new(
         peripherals.GPIO4,
@@ -153,6 +158,7 @@ async fn main(spawner: Spawner) -> ! {
         disco,
         exhaust,
         metrics,
+        config_sub,
     };
     tracing::info!("Mushclim app was built and running!");
     mushclim.run().await
@@ -206,6 +212,7 @@ struct MushclimApp<'a, P: MeasurementProvider> {
     humidifier: Humidifier<'a>,
     disco: Relay<Output<'a>>,
     metrics: MetricManager,
+    config_sub: Subscription<MushclimConfigDto>,
 }
 
 impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
@@ -213,8 +220,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         self.lights.on();
         self.disco.on();
 
-        tracing::info!("Starting sensor calibration");
-
+        tracing::info!("[MushclimApp] Starting sensor calibration");
         self.display_calibrating().await;
 
         let Ok(_) = self
@@ -222,34 +228,55 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             .calibrate(&self.config, self.lcd.as_mut())
             .await
         else {
-            tracing::error!("Failed to calibrate measurements");
+            tracing::error!("[MushclimApp] Failed to calibrate measurements");
             self.enter_safe_mode(4).await
         };
-        let mut ticker = Ticker::every(self.config.loop_delay);
-        self.exhaust.timer.ingore_tick(); //Дропнуть первый тик, ибо время еще не пошло.
-        loop {
-            self.exhaust.tick().await;
-            self.display_fan_state(self.exhaust.format_state()).await;
-            match self.acquire_safe_measurement().await {
-                Some(measurments) => {
-                    self.metrics.feed(measurments);
-                    self.log_current_measurements(measurments);
-                    self.display_measurements(measurments).await;
-                    // "проверить влажность, включить полевалку если надо"
-                    self.humidifier
-                        .tick(&measurments, self.exhaust.is_turned_on());
-                }
-                None => {
-                    tracing::error!(
-                        "CRITICAL: Sensor totally failed or reading is permanently erratic!"
-                    );
 
-                    self.enter_safe_mode(1).await;
+        self.exhaust.timer.ingore_tick();
+        let mut ticker = Ticker::every(self.config.loop_delay);
+
+        loop {
+            self.tick_step().await;
+
+            // Wait for either the next timer tick or an incoming config update
+            match select(ticker.next(), self.config_sub.next()).await {
+                Either::First(_) => {
+                    // Timer expired normally, loop around for next tick
+                }
+                Either::Second(config_dto) => {
+                    tracing::info!("[MushclimApp] Config update received");
+                    self.hard_config_update(config_dto.as_local()).await;
+                    ticker = Ticker::every(self.config.loop_delay);
                 }
             }
+        }
+    }
 
-            // Sleep for 1 minute before checking everything again
-            ticker.next().await;
+    async fn hard_config_update(&mut self, config: MushclimConfig) {
+        self.config = config;
+        self.exhaust.force_config(&self.config);
+        self.metrics.force_config(&self.config);
+        tracing::info!("[MushclimApp] Hard config update performed");
+    }
+
+    async fn tick_step(&mut self) {
+        self.exhaust.tick().await;
+        self.display_fan_state(self.exhaust.format_state()).await;
+
+        match self.acquire_safe_measurement().await {
+            Some(measurements) => {
+                self.metrics.feed(measurements);
+                self.log_current_measurements(measurements);
+                self.display_measurements(measurements).await;
+                self.humidifier
+                    .tick(&measurements, self.exhaust.is_turned_on());
+            }
+            None => {
+                tracing::error!(
+                    "[MushclimApp] CRITICAL: Sensor totally failed or reading is permanently erratic"
+                );
+                self.enter_safe_mode(1).await;
+            }
         }
     }
 
@@ -341,7 +368,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     }
 
     pub async fn display_fan_state(&mut self, line: String<16>) {
-        tracing::info!("fan state: {}", line);
+        tracing::info!("[MushclimApp] fan state: {}", line);
         if let Some(lcd) = self.lcd.as_mut() {
             let _ = lcd.clear_row(1).await;
             let _ = lcd
@@ -377,17 +404,10 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     /// Helper to grab measurements and dump them to the logger
     fn log_current_measurements(&mut self, stats: Measurements) {
         tracing::info!(
-            "Current Stats -> Temp: {}°C, Humidity: {}%",
+            "[MushclimApp] Temp: {}°C, Humidity: {}%",
             stats.temperature,
             stats.humidity
         );
-    }
-}
-
-#[embassy_executor::task]
-pub async fn mqtt_task(mut mqtt: MqttModule<Trng>) {
-    loop {
-        mqtt.run().await;
     }
 }
 
