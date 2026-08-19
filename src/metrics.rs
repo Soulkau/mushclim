@@ -106,6 +106,10 @@ impl MetricManager {
     pub fn all(&self) -> impl Iterator<Item = &Metric> {
         self.cache.oldest_ordered()
     }
+
+    pub fn force_config(&mut self, config: &MushclimConfig) {
+        self.timer = DueTimer::new(config.metric_send_period);
+    }
 }
 
 fn format_metric(metric: &Metric) -> String<LOG_SIZE> {

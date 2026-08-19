@@ -4,6 +4,7 @@ use driverse::am2301::{self, Am2301};
 use embassy_time::{Delay, Timer};
 use esp_hal::gpio::Flex;
 use heapless::String;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     MushclimConfig,
@@ -184,7 +185,7 @@ pub trait MeasurementProvider {
     fn get_measurements(&mut self) -> Result<Measurements, Self::Error>;
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Measurements {
     pub temperature: i16,
     pub humidity: u16,
