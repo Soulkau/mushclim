@@ -91,9 +91,7 @@ async fn main(spawner: Spawner) -> ! {
         env!("WIFI_SSID").try_into().unwrap(),
         env!("WIFI_PASS").try_into().unwrap(),
     );
-    let manager = WifiManager::new(spawner.make_send(), wifi_controller).await;
-    tracing::info!("After manager");
-    manager.connect(creds).await.expect("Error connecting");
+    spawner.must_spawn(wifi_task(wifi_controller, creds));
 
     // Init network stack
     let (stack, runner) = embassy_net::new(
