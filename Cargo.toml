@@ -11,7 +11,7 @@ name = "mushclim"
 path = "./src/bin/main.rs"
 
 [dependencies]
-ivy = {git = "https://github.com/Soulkau/Ivy.git", tag = "v0.1"}
+ivy = {git = "https://github.com/Soulkau/Ivy.git", tag = "v0.2"}
 talky = {git = "https://github.com/Soulkau/Talky.git", tag="v0.1" , features = ["devices", "macros"]}
 # esp-specific
 
