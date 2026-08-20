@@ -25,7 +25,7 @@ impl CycleTimer {
         let dt = now - self.last_tick;
         self.last_tick = now;
         self.cycle_start += dt;
-        tracing::info!("[CycleTimer]: ignored tick for {}", &dt)
+        tracing::debug!("[CycleTimer]: ignored tick for {}", &dt)
     }
 
     fn elapsed_wrapped(&self) -> Duration {
@@ -51,14 +51,14 @@ impl CycleTimer {
         self.last_tick = now;
         let elapsed = now - self.cycle_start;
         if elapsed >= self.interval {
-            tracing::info!(
+            tracing::debug!(
                 "[CycleTimer]: cycle has ended, wrapping around {}",
                 &elapsed
             );
             let overshoot = elapsed.as_ticks() % self.interval.as_ticks();
             self.cycle_start = now - Duration::from_ticks(overshoot);
         }
-        tracing::info!("[CycleTimer]: ticked successfully");
+        tracing::debug!("[CycleTimer]: ticked successfully");
         self.elapsed_wrapped() >= self.burst_start()
     }
 
@@ -90,7 +90,7 @@ impl CycleTimer {
             let minutes = remaining.as_secs() / 60;
             let _ = write!(string, "{}m", minutes);
         }
-        tracing::info!("[CycleTimer]: {} left until change", string);
+        tracing::debug!("[CycleTimer]: {} left until change", string);
         string
     }
 }
