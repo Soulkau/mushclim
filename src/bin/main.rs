@@ -143,7 +143,7 @@ async fn main(spawner: Spawner) -> ! {
     let lights = create_relay!(peripherals.GPIO0); //Those all are on by default
 
     let measurement_manager = MeasurementManager::new(am2301);
-    let config = MushclimConfig::default();
+    let config = MushclimConfigDto::default().as_local();
     let exhaust = ExhaustManager::new(fan, &config);
     let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
     let metrics = MetricManager::new(&config);
