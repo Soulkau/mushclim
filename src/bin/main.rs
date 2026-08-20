@@ -37,7 +37,7 @@ use mushclim::lcd::{LCD_ADDRESS, Lcd, RGB_ADDRESS, TextAlign, WriteSettings};
 use mushclim::measurements::{
     MeasurementError, MeasurementManager, MeasurementProvider, Measurements,
 };
-use mushclim::{MushclimConfig, MushclimConfigDto, mk_static};
+use mushclim::{MushclimConfig, MushclimConfigDto, MushclimStats, mk_static};
 
 macro_rules! create_relay {
     ($pin:expr) => {
@@ -109,7 +109,7 @@ async fn main(spawner: Spawner) -> ! {
     };
     let config_sub = config_sub.0;
     let mqtt_handle =
-        ivy::actor!(spawner, MqttModule<Trng, 255, 1>, MqttModule::new(stack, trng, handles));
+        ivy::actor!(spawner, MqttModule<Trng, 312, 1>, MqttModule::new(stack, trng, handles));
 
     let mut out = Output::new(
         peripherals.GPIO4,
@@ -144,7 +144,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let measurement_manager = MeasurementManager::new(am2301);
     let config = MushclimConfig::default();
-    let exhaust = ExhaustManager::new(fan, &config, mqtt_handle.clone());
+    let exhaust = ExhaustManager::new(fan, &config);
     let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
     let metrics = MetricManager::new(&config);
     let mut mushclim: MushclimApp<'static, _> = MushclimApp {
@@ -212,7 +212,7 @@ struct MushclimApp<'a, P: MeasurementProvider> {
     disco: Relay<Output<'a>>,
     metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
-    mqtt_handle: MqttHandle<255>,
+    mqtt_handle: MqttHandle<312>,
 }
 
 impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
@@ -270,6 +270,8 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                 self.display_measurements(measurements).await;
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
+                 self.log_current_measurements(measurements, self.humidifier.is_on()).await;
+                self.send_stats(measurements, self.exhaust.is_turned_on(), self.humidifier.is_on()).await;
             }
             None => {
                 tracing::error!(
@@ -400,7 +402,19 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
             let _ = lcd.write_str_no(&line).await;
         }
     }
-
+    
+    async fn send_stats(&self, measurements: Measurements, exhaust_on: bool, humidifier_on: bool) {
+        let stats = MushclimStats {
+            temperature: measurements.temperature,
+            humidity: measurements.humidity,
+            exhaust_on,
+            humidifier_on
+        };
+        
+        self.mqtt_handle.publish("mushclim/stats", stats).await;
+    }
+    
+    
     /// Helper to grab measurements and dump them to the logger
     async fn log_current_measurements(&mut self, stats: Measurements, humidifier_on: bool) {
         tracing::info!(
