@@ -266,7 +266,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
         match self.acquire_safe_measurement().await {
             Some(measurements) => {
                 self.metrics.feed(measurements, &self.mqtt_handle).await;
-                self.log_current_measurements(measurements).await;
+               
                 self.display_measurements(measurements).await;
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
@@ -402,14 +402,12 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     }
 
     /// Helper to grab measurements and dump them to the logger
-    async fn log_current_measurements(&mut self, stats: Measurements) {
-        self.mqtt_handle
-            .publish("mushclim/measurements", stats)
-            .await;
+    async fn log_current_measurements(&mut self, stats: Measurements, humidifier_on: bool) {
         tracing::info!(
-            "[MushclimApp] Temp: {}°C, Humidity: {}%",
+            "[MushclimApp] Temp: {}°C, Humidity: {}% Humidifier: {}",
             stats.temperature,
-            stats.humidity
+            stats.humidity,
+            humidifier_on
         );
     }
 }
