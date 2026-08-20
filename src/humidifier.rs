@@ -7,7 +7,7 @@ use crate::{MushclimConfig, measurements::Measurements};
 
 pub struct Humidifier<'a> {
     switch: Relay<Output<'a>>,
-    treshold: RangeInclusive<u16>,
+    treshold: RangeInclusive<u16>
 }
 
 impl<'a> Humidifier<'a> {
@@ -52,6 +52,11 @@ impl<'a> Humidifier<'a> {
         }
     }
 
+    pub fn update_config(&mut self, config: &MushclimConfig) {
+        self.treshold = config.humidity_threshold.clone();
+    }
+     
+    
     pub fn turn_on(&mut self) {
         let _ = self.switch.on();
     }

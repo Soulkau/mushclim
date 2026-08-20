@@ -262,7 +262,8 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
     async fn hard_config_update(&mut self, config: MushclimConfig) {
         self.config = config;
         self.exhaust.force_config(&self.config);
-        self.metrics.force_config(&self.config);
+        self.metrics.force_config(&self.config); 
+        self.humidifier.update_config(&self.config);
         tracing::info!("[MushclimApp] Hard config update performed");
     }
 
