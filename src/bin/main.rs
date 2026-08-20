@@ -8,6 +8,9 @@
 
 extern crate alloc;
 use bt_hci::controller::ExternalController;
+use esp_storage::FlashStorage;
+use ivy::storage::{StorageKey, StorageModule};
+use sequential_storage::map::MapConfig;
 use core::fmt::Write;
 use driverse::am2301::Am2301;
 use driverse::relay::Relay;
@@ -23,7 +26,7 @@ use esp_hal::rng::{Rng, Trng, TrngSource};
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::ble::controller::BleConnector;
 use esp_radio::wifi::WifiDevice;
-use ivy::count;
+use ivy::{count, init_storage};
 use ivy::declare_topics;
 use ivy::mqtt::{MqttHandle, MqttModule, Subscription};
 use mushclim::humidifier::Humidifier;
@@ -50,6 +53,7 @@ macro_rules! create_relay {
     };
 }
 
+const CONF_KEY: StorageKey = StorageKey::new(101);
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -77,13 +81,13 @@ async fn main(spawner: Spawner) -> ! {
     let ble_controller = ExternalController::<BleConnector, 20>::new(transport);
 
     let wifi_interface = interfaces.station;
-    // let storage = mk_storage!(
-    //     FlashStorage,
-    //     FlashStorage::new(peripherals.FLASH),
-    //     MapConfig::new(0x9000..0xF000)
-    // );
+    let storage = init_storage!(
+        FlashStorage,
+        FlashStorage::new(peripherals.FLASH),
+        MapConfig::new(0x9000..0xF000)
+    );
     // let device_meta = DeviceMetadata::load(&storage, talky::device::DeviceType::MushClimate).await;
-
+    
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
@@ -143,7 +147,7 @@ async fn main(spawner: Spawner) -> ! {
     let lights = create_relay!(peripherals.GPIO0); //Those all are on by default
 
     let measurement_manager = MeasurementManager::new(am2301);
-    let config = MushclimConfigDto::default().as_local();
+    let config: MushclimConfig = storage.get::<MushclimConfigDto>(CONF_KEY).await.unwrap_or(MushclimConfigDto::default()).as_local();
     let exhaust = ExhaustManager::new(fan, &config);
     let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
     let metrics = MetricManager::new(&config);
@@ -157,7 +161,8 @@ async fn main(spawner: Spawner) -> ! {
         exhaust,
         metrics,
         config_sub,
-        mqtt_handle,
+        mqtt_handle, 
+        storage
     };
     tracing::info!("Mushclim app was built and running!");
     mushclim.run().await
@@ -213,6 +218,7 @@ struct MushclimApp<'a, P: MeasurementProvider> {
     metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
     mqtt_handle: MqttHandle<312>,
+    storage: StorageModule<FlashStorage<'static>>
 }
 
 impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
@@ -246,6 +252,7 @@ impl<'a, P: MeasurementProvider> MushclimApp<'a, P> {
                 Either::Second(config_dto) => {
                     tracing::info!("[MushclimApp] Config update received");
                     self.hard_config_update(config_dto.as_local()).await;
+                    self.storage.set(CONF_KEY, &config_dto).await;
                     ticker = Ticker::every(self.config.loop_delay);
                 }
             }
