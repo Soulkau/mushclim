@@ -31,6 +31,15 @@ macro_rules! mk_static {
     }};
 }
 
+#[derive(Debug, Serialize)]
+pub struct MushclimStats { 
+    pub temperature: i16,
+    pub humidity: u16,
+    pub humidifier_on: bool,
+    pub exhaust_on: bool
+}
+
+
 pub const METRIC_SNAPSHOT_AMOUNT: usize = 10;
 
 #[derive(Debug)]

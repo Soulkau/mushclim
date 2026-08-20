@@ -82,7 +82,7 @@ impl MetricManager {
         }
     }
 
-    pub async fn feed(&mut self, measurements: Measurements, handle: &MqttHandle<255>) {
+    pub async fn feed(&mut self, measurements: Measurements, handle: &MqttHandle<312>) {
         self.unfinished.record(
             measurements.temperature as f32,
             measurements.humidity as f32,

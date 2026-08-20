@@ -11,19 +11,16 @@ use crate::{MushclimConfig, timer::CycleTimer};
 pub struct ExhaustManager<'a> {
     pub exhaust: Relay<Output<'a>>,
     pub timer: CycleTimer,
-    pub handle: MqttHandle<255>,
 }
 
 impl<'a> ExhaustManager<'a> {
     pub fn new(
         exhaust: Relay<Output<'a>>,
         config: &MushclimConfig,
-        handle: MqttHandle<255>,
     ) -> Self {
         Self {
             exhaust,
             timer: CycleTimer::new(config.exhaust_duty_interval, config.exhaust_duty),
-            handle,
         }
     }
 
@@ -45,9 +42,6 @@ impl<'a> ExhaustManager<'a> {
     }
 
     pub async fn switch(&mut self, on: bool) {
-        self.handle
-            .publish("mushclim/fan", ExhaustState { on })
-            .await;
         if on {
             self.exhaust.on();
         } else {
@@ -80,9 +74,4 @@ impl<'a> ExhaustManager<'a> {
     pub fn reset(&mut self) {
         self.exhaust.off();
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ExhaustState {
-    on: bool,
 }
