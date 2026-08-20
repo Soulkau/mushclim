@@ -56,28 +56,11 @@ pub struct MushclimConfig {
     pub loop_delay: Duration,                  //Tick/loop frequency
     pub metric_send_period: Duration,
 }
-impl Default for MushclimConfig {
-    fn default() -> Self {
-        Self {
-            humidity_threshold: 86..=90,
-            retry_count: 10,
-            max_temp_delta: 9,
-            max_humidity_delta: 30,
-            calibration_samples: 10,
-            safe_humidity_duty_interval: Duration::from_secs(20 * 60),
-            safe_humidity_duty: Duration::from_secs(4 * 60),
-            exhaust_duty: Duration::from_secs(120),
-            exhaust_duty_interval: Duration::from_secs(50 * 60),
-            loop_delay: Duration::from_secs(30),
-            metric_send_period: Duration::from_secs(3600),
-        }
-    }
-}
 
 /// All of duration values in config use seconds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct MushclimConfigDto {
-    #[serde(default = "default_true")]
     pub preserve: bool,
     pub humidity_lower_bound: u16,
     pub humidity_upper_bound: u16,
@@ -93,8 +76,24 @@ pub struct MushclimConfigDto {
     pub metric_send_period: u64,
 }
 
-fn default_true() -> bool {
-    true
+impl Default for MushclimConfigDto {
+    fn default() -> Self {
+        Self {
+            preserve: true,
+            humidity_lower_bound: 86,
+            humidity_upper_bound: 90,
+            retry_count: 10,
+            max_temp_delta: 9,
+            max_humidity_delta: 30,
+            calibration_samples: 10,
+            safe_humidity_duty_interval: 20 * 60,
+            safe_humidity_duty: 4 * 60,
+            exhaust_duty: 60,
+            exhaust_duty_interval: 30 * 60,
+            loop_delay: 30,
+            metric_send_period: 3600,
+        }
+    }
 }
 
 impl MushclimConfigDto {
