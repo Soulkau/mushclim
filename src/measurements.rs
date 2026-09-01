@@ -1,15 +1,11 @@
-use core::{convert::Infallible, fmt::Debug, fmt::Write};
+use core::fmt::Debug;
 
 use driverse::am2301::{self, Am2301};
 use embassy_time::{Delay, Timer};
-use esp_hal::gpio::Flex;
-use heapless::String;
+use embedded_hal::digital::{InputPin, OutputPin};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    MushclimConfig,
-    lcd::{Lcd, TextAlign, WriteSettings},
-};
+use crate::MushclimConfig;
 
 #[derive(thiserror::Error, Debug)]
 pub enum MeasurementError<E> {
@@ -81,47 +77,13 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
         }
     }
 
-    pub async fn calibrate(
-        &mut self,
-        config: &MushclimConfig,
-        mut lcd: Option<&mut Lcd>,
-    ) -> Result<(), P::Error> {
+    pub async fn calibrate(&mut self, config: &MushclimConfig) -> Result<(), P::Error> {
         // --- nested helpers ---
-
-        async fn write_header(lcd: &mut Lcd) {
-            let _ = lcd
-                .write_str(
-                    0,
-                    "Calibrating",
-                    &WriteSettings::new().align(TextAlign::Center),
-                )
-                .await;
-        }
-
-        async fn write_status_line(lcd: &mut Lcd, done: usize, total: usize, m: &Measurements) {
-            let mut line: String<32> = String::new();
-            let _ = write!(
-                line,
-                "{}/{} T{:.0}C H{:.0}%",
-                done, total, m.temperature, m.humidity
-            );
-            let _ = lcd
-                .write_str(
-                    1,
-                    &line,
-                    &WriteSettings::new().align(TextAlign::Center).clear(false),
-                )
-                .await;
-        }
 
         // --- main tracingic ---
 
         let mut successful_samples = 0;
         let mut consecutive_failures = 0;
-
-        if let Some(l) = lcd.as_mut() {
-            write_header(l).await;
-        }
 
         while successful_samples < config.calibration_samples {
             match self.get_raw_measurements() {
@@ -135,11 +97,6 @@ impl<P: MeasurementProvider> MeasurementManager<P> {
                         m.temperature,
                         m.humidity
                     );
-
-                    if let Some(l) = lcd.as_mut() {
-                        write_status_line(l, successful_samples, config.calibration_samples, &m)
-                            .await;
-                    }
 
                     Timer::after_secs(2).await;
                 }
@@ -202,8 +159,8 @@ impl Measurements {
     }
 }
 
-impl<'a> MeasurementProvider for Am2301<'a, Flex<'static>> {
-    type Error = am2301::Error<Infallible>;
+impl<'a, T: OutputPin + InputPin> MeasurementProvider for Am2301<'a, T> {
+    type Error = am2301::Error<T::Error>;
 
     fn get_measurements(&mut self) -> Result<Measurements, Self::Error> {
         let (humidity, temperature) = self.measure(&mut Delay)?;

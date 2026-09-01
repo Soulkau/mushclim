@@ -1,17 +1,17 @@
 use core::ops::RangeInclusive;
 
 use driverse::relay::Relay;
-use esp_hal::gpio::Output;
+use embedded_hal::digital::OutputPin;
 
 use crate::{MushclimConfig, measurements::Measurements};
 
-pub struct Humidifier<'a> {
-    switch: Relay<Output<'a>>,
-    treshold: RangeInclusive<u16>
+pub struct Humidifier<P: OutputPin> {
+    switch: Relay<P>,
+    treshold: RangeInclusive<u16>,
 }
 
-impl<'a> Humidifier<'a> {
-    pub fn new(switch: Relay<Output<'a>>, config: &MushclimConfig) -> Self {
+impl<P: OutputPin> Humidifier<P> {
+    pub fn new(switch: Relay<P>, config: &MushclimConfig) -> Self {
         Self {
             switch,
             treshold: config.humidity_threshold.clone(),
@@ -23,7 +23,7 @@ impl<'a> Humidifier<'a> {
             if self.switch.is_on() {
                 tracing::info!("Humidifier: Paused, exhaust active.");
             }
-            self.switch.off();
+            self.switch.off().ok();
             return;
         }
 
@@ -38,7 +38,7 @@ impl<'a> Humidifier<'a> {
                     current_humidity,
                     low_bound
                 );
-                let _ = self.switch.on();
+                self.switch.on().ok();
             }
         } else if current_humidity >= comfort_bound {
             if self.switch.is_on() {
@@ -47,7 +47,7 @@ impl<'a> Humidifier<'a> {
                     current_humidity,
                     comfort_bound
                 );
-                let _ = self.switch.off();
+                self.switch.off().ok();
             }
         }
     }
@@ -55,8 +55,7 @@ impl<'a> Humidifier<'a> {
     pub fn update_config(&mut self, config: &MushclimConfig) {
         self.treshold = config.humidity_threshold.clone();
     }
-     
-    
+
     pub fn turn_on(&mut self) {
         let _ = self.switch.on();
     }
