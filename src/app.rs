@@ -7,17 +7,17 @@ use ivy::{
 };
 
 use crate::{
-    MushclimConfig, MushclimConfigDto, MushclimPlatform,
+    MushclimConfig, MushclimConfigDto, MushclimPlatform, MushclimStats,
     exhaust::ExhaustManager,
     humidifier::Humidifier,
-    measurements::{MeasurementError, MeasurementManager, MeasurementProvider, Measurements},
+    measurements::{MeasurementError, MeasurementManager, Measurements},
     metrics::MetricManager,
     timer::CycleTimer,
 };
 
 const CONF_KEY: StorageKey = StorageKey::new(101);
 
-struct MushclimApp<P: MushclimPlatform> {
+pub struct MushclimApp<P: MushclimPlatform> {
     measurement_manager: MeasurementManager<P::Measurement>,
     exhaust: ExhaustManager<P::ExhaustPin>,
     config: MushclimConfig,
@@ -32,11 +32,10 @@ struct MushclimApp<P: MushclimPlatform> {
 
 impl<P: MushclimPlatform> MushclimApp<P> {
     pub async fn run(&mut self) -> ! {
-        self.lights.on();
-        self.disco.on();
+        self.lights.on().ok();
+        self.disco.on().ok();
 
         tracing::info!("[MushclimApp] Starting sensor calibration");
-        self.display_calibrating().await;
 
         let Ok(_) = self.measurement_manager.calibrate(&self.config).await else {
             tracing::error!("[MushclimApp] Failed to calibrate measurements");
@@ -79,11 +78,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             Some(measurements) => {
                 self.metrics.feed(measurements, &self.mqtt_handle).await;
 
-                self.display_measurements(measurements).await;
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
-                self.log_current_measurements(measurements, self.humidifier.is_on())
-                    .await;
+                self.log_state(measurements).await;
                 self.send_stats(
                     measurements,
                     self.exhaust.is_turned_on(),
@@ -131,7 +128,6 @@ impl<P: MushclimPlatform> MushclimApp<P> {
 
         self.humidifier.turn_off();
         self.exhaust.reset();
-        self.display_safe_mode(error_code).await;
 
         let mut humidity_timer = CycleTimer::new(
             self.config.safe_humidity_duty_interval,
@@ -166,61 +162,6 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         }
     }
 
-    pub async fn display_calibrating(&mut self) {
-        if let Some(lcd) = self.lcd.as_mut() {
-            let _ = lcd.set_rgb(0, 255, 0).await;
-            let _ = lcd.write_str_no("Calibrating").await;
-        }
-    }
-
-    pub async fn display_measurements(&mut self, stats: Measurements) {
-        if let Some(lcd) = self.lcd.as_mut() {
-            let mut line: String<32> = String::new();
-            let _ = write!(line, "T:{:.1}C H:{:.0}%", stats.temperature, stats.humidity);
-            let _ = lcd
-                .write_str(
-                    0,
-                    &line,
-                    &WriteSettings::new().align(TextAlign::Center).clear(false),
-                )
-                .await;
-        }
-    }
-
-    pub async fn display_fan_state(&mut self, line: String<16>) {
-        tracing::info!("[MushclimApp] fan state: {}", line);
-        if let Some(lcd) = self.lcd.as_mut() {
-            let _ = lcd.clear_row(1).await;
-            let _ = lcd
-                .write_str(
-                    1,
-                    &line,
-                    &WriteSettings::new().align(TextAlign::Center).clear(false),
-                )
-                .await;
-        }
-    }
-
-    /// Flip the LCD into a visual "safe mode" indicator: red backlight + message.
-    pub async fn display_safe_mode(&mut self, error_code: u32) {
-        if let Some(lcd) = self.lcd.as_mut() {
-            let _ = lcd.set_rgb(125, 0, 0).await;
-
-            let msg = match error_code {
-                1 => "Err01 Sensor",
-                2 => "Err02 Erratic",
-                3 => "Err03 NoCalib",
-                4 => "Err04 CalibFail",
-                5 => "Err05 Exhaust",
-                _ => "Err00 Unknown",
-            };
-
-            let mut line: String<32> = String::new();
-            let _ = write!(line, "{}", msg);
-            let _ = lcd.write_str_no(&line).await;
-        }
-    }
-
     async fn send_stats(&self, measurements: Measurements, exhaust_on: bool, humidifier_on: bool) {
         let stats = MushclimStats {
             temperature: measurements.temperature,
@@ -233,12 +174,13 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     }
 
     /// Helper to grab measurements and dump them to the logger
-    async fn log_current_measurements(&mut self, stats: Measurements, humidifier_on: bool) {
+    async fn log_state(&mut self, stats: Measurements) {
         tracing::info!(
-            "[MushclimApp] Temp: {}°C, Humidity: {}% Humidifier: {}",
+            "[MushclimApp] Temp: {}°C, Humidity: {}% Humidifier: {}, Exhaust: {}",
             stats.temperature,
             stats.humidity,
-            humidifier_on
+            self.humidifier.is_on(),
+            self.exhaust.is_turned_on()
         );
     }
 }
