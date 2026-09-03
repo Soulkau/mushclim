@@ -80,13 +80,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
 
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
-                self.log_state(measurements).await;
-                self.send_stats(
-                    measurements,
-                    self.exhaust.is_turned_on(),
-                    self.humidifier.is_on(),
-                )
-                .await;
+                self.log_app_state(measurements).await;
             }
             None => {
                 tracing::error!(
@@ -162,25 +156,20 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         }
     }
 
-    async fn send_stats(&self, measurements: Measurements, exhaust_on: bool, humidifier_on: bool) {
+    async fn log_app_state(&self, measurements: Measurements) {
         let stats = MushclimStats {
             temperature: measurements.temperature,
             humidity: measurements.humidity,
-            exhaust_on,
-            humidifier_on,
+            exhaust_on: self.exhaust.is_turned_on(),
+            humidifier_on: self.humidifier.is_on(),
         };
-
-        self.mqtt_handle.publish("mushclim/stats", stats).await;
-    }
-
-    /// Helper to grab measurements and dump them to the logger
-    async fn log_state(&mut self, stats: Measurements) {
         tracing::info!(
             "[MushclimApp] Temp: {}°C, Humidity: {}% Humidifier: {}, Exhaust: {}",
             stats.temperature,
             stats.humidity,
-            self.humidifier.is_on(),
-            self.exhaust.is_turned_on()
+            stats.humidifier_on,
+            self.exhaust.state_log()
         );
+        self.mqtt_handle.publish("mushclim/stats", stats).await;
     }
 }

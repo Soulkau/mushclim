@@ -1,7 +1,11 @@
+use crate::{
+    MushclimConfig,
+    timer::{CycleTimer, DurationExts},
+};
+use core::fmt::Write;
 use driverse::relay::Relay;
 use embedded_hal::digital::OutputPin;
-
-use crate::{MushclimConfig, timer::CycleTimer};
+use heapless::String;
 
 pub struct ExhaustManager<P: OutputPin> {
     pub exhaust: Relay<P>,
@@ -31,6 +35,27 @@ impl<P: OutputPin> ExhaustManager<P> {
             }
         }
         should_be_on
+    }
+
+    pub fn state_log(&self) -> String<32> {
+        let (is_on_duty, until_switch) = self.timer.time_until_change();
+        let state = if is_on_duty { "off" } else { "on" };
+        let mut s = String::new();
+
+        if write!(
+            s,
+            "on: {} / {} in {}",
+            is_on_duty,
+            state,
+            until_switch.pretty_string()
+        )
+        .is_err()
+        {
+            s.clear();
+            let _ = s.push_str("fan state fmt err");
+        }
+
+        s
     }
 
     pub fn is_turned_on(&self) -> bool {
