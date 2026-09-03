@@ -36,10 +36,14 @@ use sequential_storage::map::MapConfig;
 
 use heapless::String;
 use mushclim::exhaust::ExhaustManager;
-use mushclim::measurements::{
-    MeasurementError, MeasurementManager, MeasurementProvider, Measurements,
-};
-use mushclim::{MushclimConfig, MushclimConfigDto, MushclimStats, mk_static};
+use mushclim::humidifier::Humidifier;
+use mushclim::measurements::{MeasurementManager, MockSensorProvider};
+use mushclim::metrics::MetricManager;
+use mushclim::{MushclimConfig, MushclimConfigDto, MushclimPlatform, mk_static};
+use rand::CryptoRng;
+use rand::SeedableRng;
+use rand_chacha::ChaChaRng;
+use sequential_storage::map::MapConfig;
 
 use crate::wifi::{WifiCredentials, wifi_task};
 
@@ -112,14 +116,15 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(net_task(runner).unwrap());
 
-    let trng = Rng::new();
-    // let (handles, config_sub) = declare_topics! {
-    //     config => "mushclim/config" : MushclimConfigDto
-    // };
-    // let config_sub = config_sub.0;
-    // let mqtt_handle =
-    //     ivy::actor!(spawner, MqttModule<Rng, 312, 1>, MqttModule::new(stack, trng, handles))
-    //         .unwrap();
+    let (handles, config_sub) = declare_subcriptions! {
+        config => "mushclim/config" : MushclimConfigDto
+    };
+
+    // NOTE: This is temporary trng workaround for esp32c5, meanwhile trng is not yet available
+    let trng = rand_chacha::ChaChaRng::seed_from_u64(seed);
+    let mqtt_handle =
+        ivy::actor!(spawner, MqttModule<ChaChaRng, MQTT_PAYLOAD_SIZE, 1>, MqttModule::new(stack, trng, handles))
+            .unwrap();
 
     let mut out = Output::new(
         peripherals.GPIO4,
