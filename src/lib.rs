@@ -117,7 +117,7 @@ impl MushclimConfigDto {
     }
 }
 
-trait MushclimPlatform {
+pub trait MushclimPlatform {
     type ExhaustPin: OutputPin;
     type LightPin: OutputPin;
     type DiscoPin: OutputPin;
