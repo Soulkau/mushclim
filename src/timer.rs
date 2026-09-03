@@ -80,7 +80,7 @@ impl CycleTimer {
         self.elapsed_wrapped() >= self.burst_start()
     }
 
-    pub fn time_until_change(&self) -> (bool, String<4>) {
+    pub fn time_until_change(&self) -> (bool, Duration) {
         let elapsed = self.elapsed_wrapped();
         let burst_start = self.burst_start();
         let started = elapsed >= burst_start;
@@ -91,25 +91,12 @@ impl CycleTimer {
             burst_start.sub(elapsed)
         };
 
-        (started, self.format_time_string(remaining))
+        (started, remaining)
     }
 
     pub fn reset(&mut self) {
         self.cycle_start = Instant::now();
         self.last_tick = Instant::now();
-    }
-
-    fn format_time_string(&self, remaining: Duration) -> String<4> {
-        let mut string = String::new();
-
-        if remaining.as_secs() < 60 {
-            let _ = write!(string, "{}s", remaining.as_secs());
-        } else {
-            let minutes = remaining.as_secs() / 60;
-            let _ = write!(string, "{}m", minutes);
-        }
-        tracing::debug!("[CycleTimer]: {} left until change", string);
-        string
     }
 }
 
@@ -136,5 +123,30 @@ impl DueTimer {
             self.next_due = now + self.interval;
         }
         true
+    }
+}
+
+pub(crate) trait DurationExts {
+    fn pretty_string(&self) -> String<16>;
+}
+
+impl DurationExts for Duration {
+    fn pretty_string(&self) -> String<16> {
+        let mut string = String::new();
+        let total_ms = self.as_millis();
+
+        let (time, unit) = if total_ms < 1_000 {
+            (total_ms, "ms")
+        } else if total_ms < 60_000 {
+            (self.as_secs(), "s")
+        } else if total_ms < 3_600_000 {
+            (self.as_secs() / 60, "m")
+        } else {
+            (self.as_secs() / 3_600, "h")
+        };
+
+        write!(string, "{}{}", time, unit).ok();
+
+        string
     }
 }
