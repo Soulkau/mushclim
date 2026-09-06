@@ -1,5 +1,5 @@
 [target.riscv32imac-unknown-none-elf]
-runner = "espflash flash --monitor --chip esp32c6"
+runner = "espflash flash --monitor --chip esp32c5"
 rustflags = [
   # --- KEEP existing `link-arg` flags ---
 
@@ -7,8 +7,8 @@ rustflags = [
 ]
 
 [env]
-NATS_PASS="pss"
-NATS_USER="usr"
+
+
 
 [build]
 rustflags = [

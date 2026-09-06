@@ -1,12 +1,14 @@
 [package]
 edition = "2024"
-name = "mushclim"
+name = "mushclim_esp32c5"
 rust-version = "1.88"
 version = "0.1.0"
 
-[lib]
+[[bin]]
 test = false
 bench = false
+name = "mushclim_esp32c5"
+path = "./src/main.rs"
 
 [profile.dev]
 opt-level = "s"
@@ -22,24 +24,32 @@ opt-level = 's'
 overflow-checks = false
 
 [dependencies]
-ivy = {git = "https://github.com/Soulkau/Ivy.git", tag = "v0.2"}
-talky = {git = "https://github.com/Soulkau/Talky.git", tag="v0.1" , features = ["devices", "macros"]}
-# esp-specific
+ivy = { path = "/home/soulkau/Projects/ivy" }
+talky = { git = "https://github.com/Soulkau/Talky.git", tag = "v0.1", features = ["devices", "macros"] }
 
+esp-hal = { version = "1.1.0", features = ["esp32c5", "unstable"] }
+esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "esp-radio", "esp32c5"] }
 
-# embedded-abstractions
-embedded-io = "0.7.0"
+esp-radio = { version = "0.18.0", features = ["esp-alloc", "esp32c5", "unstable", "wifi"] }
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c5"] }
+
+esp-println = { version = "0.18.0", features = ["esp32c5", "log-04"] }
+esp-storage = { version = "0.9.0", features = ["esp32c5"] }
+esp-alloc = { version = "0.10.0", features = ["esp32c5"] }
+esp-backtrace = { version = "0.20.0", features = ["esp32c5", "println", "panic-handler"] }
+
+# Embedded Abstractions
+embedded-io = "0.7.1"
 embedded-io-async = "0.7.0"
 embedded-time = "0.12.1"
 embedded-storage = "0.3.1"
 embassy-net = { version = "0.9.1", features = ["dhcpv4", "medium-ethernet", "tcp", "udp", "dns", "dhcpv4"] }
-embassy-executor = { version = "0.9.0", features = [] }
+embassy-executor = { version = "0.10.0", features = [] }
 embassy-time = "0.5.0"
 embassy-futures = "0.1.2"
 embassy-sync = "0.7.2"
 embassy-embedded-hal = "0.6.0"
-embedded-hal-async = "1.0.0"
-bt-hci = "0.6.0"
+bt-hci = "0.8.0"
 smoltcp = { version = "0.12.0", default-features = false, features = ["medium-ethernet", "multicast", "proto-dhcpv4", "proto-dns", "proto-ipv4", "socket-dns", "socket-tcp", "socket-udp"] }
 critical-section = "1.2.0"
 static_cell = "2.1.1"
@@ -48,9 +58,8 @@ nb = "1.1.0"
 trouble-host = "0.5.0"
 sequential-storage = "7.2.0"
 
-# others
-
-driverse = { git="https://github.com/Soulkau/Driverse.git" }
+# Other Libraries
+driverse = { path = "/home/soulkau/Projects/driverse"}
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 log = { version = "0.4.29" }
@@ -67,4 +76,7 @@ thiserror = { version = "2.0.18", default-features = false }
 embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "426f327", default-features = false }
 embedded-hal = "1.0.0"
 embedded-nal-async = "0.9.0"
-# rapid = { path = "/home/soulkau/Projects/rapid" }
+
+rand_chacha = { version = "0.3", default-features = false }
+
+mushclim = {path = "../../"}

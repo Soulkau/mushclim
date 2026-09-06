@@ -1,23 +1,19 @@
+use crate::{
+    MushclimConfig,
+    timer::{CycleTimer, DurationExts},
+};
 use core::fmt::Write;
-
 use driverse::relay::Relay;
-use esp_hal::gpio::Output;
+use embedded_hal::digital::OutputPin;
 use heapless::String;
-use ivy::mqtt::MqttHandle;
-use serde::{Deserialize, Serialize};
 
-use crate::{MushclimConfig, timer::CycleTimer};
-
-pub struct ExhaustManager<'a> {
-    pub exhaust: Relay<Output<'a>>,
+pub struct ExhaustManager<P: OutputPin> {
+    pub exhaust: Relay<P>,
     pub timer: CycleTimer,
 }
 
-impl<'a> ExhaustManager<'a> {
-    pub fn new(
-        exhaust: Relay<Output<'a>>,
-        config: &MushclimConfig,
-    ) -> Self {
+impl<P: OutputPin> ExhaustManager<P> {
+    pub fn new(exhaust: Relay<P>, config: &MushclimConfig) -> Self {
         Self {
             exhaust,
             timer: CycleTimer::new(config.exhaust_duty_interval, config.exhaust_duty),
@@ -29,38 +25,37 @@ impl<'a> ExhaustManager<'a> {
         let is_on = self.exhaust.is_on();
         if should_be_on {
             if !is_on {
-                self.switch(true).await;
+                self.exhaust.on().ok();
                 tracing::info!("[Exhaust]: Turned on");
             }
         } else {
             if is_on {
-                self.switch(false).await;
+                self.exhaust.off().ok();
                 tracing::info!("[Exhaust]: Turned off");
             }
         }
         should_be_on
     }
 
-    pub async fn switch(&mut self, on: bool) {
-        if on {
-            self.exhaust.on();
-        } else {
-            self.exhaust.off();
-        }
-    }
+    pub fn state_log(&self) -> String<32> {
+        let (is_on_duty, until_switch) = self.timer.time_until_change();
+        let state = if is_on_duty { "off" } else { "on" };
+        let mut s = String::new();
 
-    pub fn log_state(&self) -> String<16> {
-        let mut string = String::new();
-        let _ = string.write_str("Fan: ");
-        let (started, time) = self.timer.time_until_change();
-
-        if started {
-            let _ = string.write_str("off");
-        } else {
-            let _ = string.write_str("on");
+        if write!(
+            s,
+            "on: {} / {} in {}",
+            is_on_duty,
+            state,
+            until_switch.pretty_string()
+        )
+        .is_err()
+        {
+            s.clear();
+            let _ = s.push_str("fan state fmt err");
         }
-        let _ = write!(string, " in {}", time);
-        string
+
+        s
     }
 
     pub fn is_turned_on(&self) -> bool {
@@ -72,6 +67,6 @@ impl<'a> ExhaustManager<'a> {
     }
 
     pub fn reset(&mut self) {
-        self.exhaust.off();
+        self.exhaust.off().ok();
     }
 }
