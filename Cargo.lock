@@ -493,12 +493,13 @@ dependencies = [
 [[package]]
 name = "driverse"
 version = "0.1.0"
-source = "git+https://github.com/Soulkau/Driverse.git#d92b3e11c57aea0f800b3ca37494302765df3eca"
+source = "git+https://github.com/Soulkau/Driverse.git#ace7446cc7830939f8b6a3f6e21f71cad7011287"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-hal-bus",
  "embedded-io-async 0.7.0",
+ "libm",
  "log",
  "thiserror",
 ]
@@ -1309,6 +1310,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
 name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1416,6 +1423,7 @@ dependencies = [
  "embassy-sync 0.7.2",
  "embassy-time",
  "embedded-hal 1.0.0",
+ "embedded-hal-async",
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
  "embedded-nal-async",
