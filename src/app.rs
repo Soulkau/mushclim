@@ -17,7 +17,9 @@ use crate::{
 
 const CONF_KEY: StorageKey = StorageKey::new(101);
 
-pub type MushclimMqttHandle = MqttHandle<512>;
+pub const MUSHCLIM_MQTT_PAYLOAD: usize = 512;
+
+pub type MushclimMqttHandle = MqttHandle<MUSHCLIM_MQTT_PAYLOAD>;
 
 macro_rules! create_relay {
     ($pin:expr) => {
@@ -51,9 +53,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     pub fn new(
         pins: MushclimPins<P>,
         config: MushclimConfig,
-        config_sub: Subscription<MushclimConfigDto>,
-        mqtt_handle: MushclimMqttHandle,
         storage: StorageModule<P::FlashStorage>,
+        mqtt_handle: MushclimMqttHandle,
+        config_sub: Subscription<MushclimConfigDto>,
     ) -> Self {
         Self {
             measurement_manager: MeasurementManager::new(Stcc4::new(pins.sensor, pins.delay)),
