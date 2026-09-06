@@ -3,9 +3,9 @@ use core::ops::RangeInclusive;
 use driverse::relay::Relay;
 use embedded_hal::digital::OutputPin;
 
-use crate::{MushclimConfig, measurements::Measurements};
+use crate::{MushclimConfig, measurements::Measurement};
 
-pub struct Humidifier<P: OutputPin> {
+pub(crate) struct Humidifier<P: OutputPin> {
     switch: Relay<P>,
     treshold: RangeInclusive<u16>,
 }
@@ -18,7 +18,7 @@ impl<P: OutputPin> Humidifier<P> {
         }
     }
 
-    pub fn tick(&mut self, measurements: &Measurements, is_exhaust_on: bool) {
+    pub fn tick(&mut self, measurements: &Measurement, is_exhaust_on: bool) {
         if is_exhaust_on {
             if self.switch.is_on() {
                 tracing::info!("Humidifier: Paused, exhaust active.");
@@ -27,9 +27,9 @@ impl<P: OutputPin> Humidifier<P> {
             return;
         }
 
-        let current_humidity = measurements.humidity;
-        let low_bound = *self.treshold.start();
-        let comfort_bound = *self.treshold.end();
+        let current_humidity = measurements.humidity_pct;
+        let low_bound = *self.treshold.start() as f32;
+        let comfort_bound = *self.treshold.end() as f32;
 
         if current_humidity <= low_bound {
             if !self.switch.is_on() {

@@ -3,10 +3,9 @@
 use core::ops::RangeInclusive;
 use embassy_time::Duration;
 use embedded_hal::digital::OutputPin;
+use embedded_hal_async::{delay::DelayNs, i2c::I2c};
 use embedded_storage::nor_flash::NorFlash;
 use serde::{Deserialize, Serialize};
-
-use crate::measurements::MeasurementProvider;
 
 pub mod app;
 pub mod exhaust;
@@ -123,5 +122,6 @@ pub trait MushclimPlatform {
     type DiscoPin: OutputPin;
     type HumidifierPin: OutputPin;
     type FlashStorage: NorFlash + 'static;
-    type Measurement: MeasurementProvider;
+    type Sensor: I2c;
+    type Delay: DelayNs;
 }

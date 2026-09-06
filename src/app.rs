@@ -1,4 +1,4 @@
-use driverse::relay::Relay;
+use driverse::{relay::Relay, stcc4::Stcc4};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Ticker, Timer};
 use ivy::{
@@ -10,15 +10,32 @@ use crate::{
     MushclimConfig, MushclimConfigDto, MushclimPlatform, MushclimStats,
     exhaust::ExhaustManager,
     humidifier::Humidifier,
-    measurements::{MeasurementError, MeasurementManager, Measurements},
+    measurements::{Measurement, MeasurementError, MeasurementManager},
     metrics::MetricManager,
     timer::CycleTimer,
 };
 
 const CONF_KEY: StorageKey = StorageKey::new(101);
 
+pub type MushclimMqttHandle = MqttHandle<512>;
+
+macro_rules! create_relay {
+    ($pin:expr) => {
+        Relay::new($pin, driverse::relay::ActiveLevel::Low, false).unwrap()
+    };
+}
+
+pub struct MushclimPins<P: MushclimPlatform> {
+    pub exhaust: P::ExhaustPin,
+    pub light: P::LightPin,
+    pub disco: P::DiscoPin,
+    pub humidifier: P::HumidifierPin,
+    pub sensor: P::Sensor,
+    pub delay: P::Delay,
+}
+
 pub struct MushclimApp<P: MushclimPlatform> {
-    measurement_manager: MeasurementManager<P::Measurement>,
+    measurement_manager: MeasurementManager<P::Sensor, P::Delay>,
     exhaust: ExhaustManager<P::ExhaustPin>,
     config: MushclimConfig,
     lights: Relay<P::LightPin>,
@@ -26,21 +43,38 @@ pub struct MushclimApp<P: MushclimPlatform> {
     disco: Relay<P::DiscoPin>,
     metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
-    mqtt_handle: MqttHandle<312>,
+    mqtt_handle: MushclimMqttHandle,
     storage: StorageModule<P::FlashStorage>,
 }
 
 impl<P: MushclimPlatform> MushclimApp<P> {
+    pub fn new(
+        pins: MushclimPins<P>,
+        config: MushclimConfig,
+        config_sub: Subscription<MushclimConfigDto>,
+        mqtt_handle: MushclimMqttHandle,
+        storage: StorageModule<P::FlashStorage>,
+    ) -> Self {
+        Self {
+            measurement_manager: MeasurementManager::new(Stcc4::new(pins.sensor, pins.delay)),
+            exhaust: ExhaustManager::new(create_relay!(pins.exhaust), &config),
+            lights: create_relay!(pins.light),
+            humidifier: Humidifier::new(create_relay!(pins.humidifier), &config),
+            disco: create_relay!(pins.disco),
+            metrics: MetricManager::new(&config),
+            config,
+            config_sub,
+            mqtt_handle,
+            storage,
+        }
+    }
+
     pub async fn run(&mut self) -> ! {
         self.lights.on().ok();
         self.disco.on().ok();
 
         tracing::info!("[MushclimApp] Starting sensor calibration");
-
-        let Ok(_) = self.measurement_manager.calibrate(&self.config).await else {
-            tracing::error!("[MushclimApp] Failed to calibrate measurements");
-            self.enter_safe_mode(4).await
-        };
+        self.measurement_manager.init().await;
 
         self.exhaust.timer.ingore_tick();
         let mut ticker = Ticker::every(self.config.loop_delay);
@@ -91,34 +125,30 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         }
     }
 
-    async fn acquire_safe_measurement(&mut self) -> Option<Measurements> {
+    async fn acquire_safe_measurement(&mut self) -> Option<Measurement> {
         // Attempt up to 5 times to get a stable, validated reading
         for attempt in 1..=self.config.retry_count {
-            match self.measurement_manager.get_measurements(&self.config) {
+            match self.measurement_manager.measure(&self.config).await {
                 Ok(stats) => {
                     // It passed hardware check AND history check!
                     return Some(stats);
                 }
-                Err(MeasurementError::SensorDriver(_e)) => {
+                Err(MeasurementError::Sensor) => {
                     // "Замерить датчик -> err -> попробовать еще раз (5 попыток)"
                     tracing::warn!("Hardware read error on attempt {}. Retrying...", attempt);
                     Timer::after_secs(2).await;
                 }
-                Err(MeasurementError::ErraticReading) => {
-                    // "сверить новое измерение с историей -> err -> повторить замер и сравнить (5 раз)"
-                    tracing::warn!("Spike detected on attempt {}. Re-measuring...", attempt);
+                Err(MeasurementError::Crc) => {
+                    tracing::warn!("Sensor crc mismatch {}. Retrying shortly.", attempt);
                     Timer::after_secs(2).await;
-                }
-                Err(MeasurementError::NotCalibrated) => {
-                    self.enter_safe_mode(3).await;
                 }
             }
         }
         None
     }
 
-    async fn enter_safe_mode(&mut self, error_code: u32) -> ! {
-        tracing::error!("Entering safe mode");
+    async fn enter_safe_mode(&mut self, code: u32) -> ! {
+        tracing::error!("Entering safemode, errcode: {}", code);
 
         self.humidifier.turn_off();
         self.exhaust.reset();
@@ -156,10 +186,10 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         }
     }
 
-    async fn log_app_state(&self, measurements: Measurements) {
+    async fn log_app_state(&self, measurements: Measurement) {
         let stats = MushclimStats {
-            temperature: measurements.temperature,
-            humidity: measurements.humidity,
+            temperature: measurements.temperature_c as i16,
+            humidity: measurements.humidity_pct as u16,
             exhaust_on: self.exhaust.is_turned_on(),
             humidifier_on: self.humidifier.is_on(),
         };
