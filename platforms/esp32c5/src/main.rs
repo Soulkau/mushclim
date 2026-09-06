@@ -5,14 +5,18 @@
     reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
     holding buffers for the duration of a data transfer."
 )]
+#![feature(allocator_api)]
 
 extern crate alloc;
 use core::marker::PhantomData;
 
 use crate::wifi::{WifiCredentials, wifi_task};
+use alloc::boxed::Box;
 use embassy_executor::Spawner;
 use embassy_net::{Runner, StackResources};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::Delay;
+use embedded_tls::TlsConfig;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Output, OutputConfig};
@@ -22,7 +26,7 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{Async, time};
 use esp_radio::wifi::Interface;
 use esp_storage::FlashStorage;
-use ivy::mqtt::MqttModule;
+use ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
 use ivy::storage::StorageKey;
 use ivy::{count, declare_subcriptions, init_storage};
 use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
@@ -31,6 +35,7 @@ use mushclim::{MushclimConfig, MushclimConfigDto, MushclimPlatform, mk_static};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use sequential_storage::map::MapConfig;
+use static_cell::StaticCell;
 
 pub mod wifi;
 
@@ -40,6 +45,18 @@ macro_rules! create_output {
     };
 }
 
+static TCP_BUFFER_SIZE: usize = 9984;
+
+static TLS_BUFFER_SIZE: usize = 16640;
+
+type MushclimMqtt = MqttModule<
+    ChaChaRng,
+    MUSHCLIM_MQTT_PAYLOAD,
+    1,
+    TCP_BUFFER_SIZE,
+    TCP_BUFFER_SIZE,
+    TLS_BUFFER_SIZE,
+>;
 const CONF_KEY: StorageKey = StorageKey::new(101);
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -49,7 +66,9 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
     // Allocate Heap for Radio/COEX
-    esp_alloc::heap_allocator!(size: 131072);
+    esp_alloc::heap_allocator!(size: 68 * 1024);
+
+    esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     ivy::logger::init_mqtt_logger();
     // esp_println::logger::init_logger(log::LevelFilter::Debug);
 
@@ -99,9 +118,22 @@ async fn main(spawner: Spawner) -> ! {
 
     // NOTE: This is temporary trng workaround for esp32c5, meanwhile trng is not yet available
     let trng = rand_chacha::ChaChaRng::seed_from_u64(seed);
-    let mqtt_handle =
-        ivy::actor!(spawner, MqttModule<ChaChaRng, MUSHCLIM_MQTT_PAYLOAD, 1>, MqttModule::new(stack, trng, handles))
-            .unwrap();
+
+    let mqtt_handle = ivy::actor!(
+        spawner,
+        MushclimMqtt,
+        MushclimMqtt::new(
+            "mushdev",
+            stack,
+            handles,
+            leak(MqttState::new()),
+            leak(MqttTlsState::new()),
+            leak(MqttTcpClient::new(stack, leak(MqttTcpClientState::new()))),
+            leak(TlsConfig::default().enable_rsa_signatures()),
+            trng
+        )
+    )
+    .unwrap();
     // I2c for sensor
     let i2c = I2c::new(
         peripherals.I2C0,
@@ -128,6 +160,8 @@ async fn main(spawner: Spawner) -> ! {
         humidifier: create_output!(peripherals.GPIO24),
     };
 
+    tracing::info!("heapstats {}", esp_alloc::HEAP.stats());
+
     let mut mushclim_app = MushclimApp::new(pins, config, storage, mqtt_handle, config_sub);
 
     mushclim_app.run().await
@@ -152,4 +186,8 @@ pub async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     loop {
         runner.run().await;
     }
+}
+
+fn leak<T>(value: T) -> &'static mut T {
+    Box::leak(Box::new_in(value, esp_alloc::ExternalMemory))
 }

@@ -602,6 +602,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "driverse"
+version = "0.1.0"
+source = "git+https://github.com/Soulkau/Driverse.git#ace7446cc7830939f8b6a3f6e21f71cad7011287"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-hal-bus",
+ "embedded-io-async 0.7.0",
+ "libm",
+ "log",
+ "thiserror",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2038,7 +2052,7 @@ dependencies = [
  "async-trait",
  "bt-hci 0.6.0",
  "critical-section",
- "driverse",
+ "driverse 0.1.0 (git+https://github.com/Soulkau/Driverse.git)",
  "embassy-embedded-hal",
  "embassy-executor 0.9.1",
  "embassy-futures",
@@ -2082,7 +2096,7 @@ dependencies = [
  "async-trait",
  "bt-hci 0.8.1",
  "critical-section",
- "driverse",
+ "driverse 0.1.0",
  "embassy-embedded-hal",
  "embassy-executor 0.10.0",
  "embassy-futures",
