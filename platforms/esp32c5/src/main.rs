@@ -7,56 +7,36 @@
 )]
 
 extern crate alloc;
-use bt_hci::controller::ExternalController;
-use core::fmt::Write;
-use driverse::am2301::Am2301;
-use driverse::relay::Relay;
+use core::marker::PhantomData;
+
+use crate::wifi::{WifiCredentials, wifi_task};
 use embassy_executor::Spawner;
-use embassy_futures::select::{Either, select};
 use embassy_net::{Runner, StackResources};
-use embassy_time::{Ticker, Timer};
-use esp_alloc::HeapStats;
+use embassy_time::Delay;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Output, OutputConfig};
 use esp_hal::i2c::master::{Config, I2c};
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
-use esp_println::println;
-use esp_radio::ble::controller::BleConnector;
+use esp_hal::{Async, time};
 use esp_radio::wifi::Interface;
 use esp_storage::FlashStorage;
-use ivy::mqtt::{MqttHandle, MqttModule, Subscription};
-use ivy::storage::{StorageKey, StorageModule};
-use ivy::{count, init_storage};
-use mushclim::humidifier::Humidifier;
-use mushclim::metrics::MetricManager;
-use mushclim::timer::CycleTimer;
-use sequential_storage::map::MapConfig;
-
-use heapless::String;
-use mushclim::exhaust::ExhaustManager;
-use mushclim::humidifier::Humidifier;
-use mushclim::measurements::{MeasurementManager, MockSensorProvider};
-use mushclim::metrics::MetricManager;
+use ivy::mqtt::MqttModule;
+use ivy::storage::StorageKey;
+use ivy::{count, declare_subcriptions, init_storage};
+use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
+use mushclim::app::{MushclimApp, MushclimPins};
 use mushclim::{MushclimConfig, MushclimConfigDto, MushclimPlatform, mk_static};
-use rand::CryptoRng;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use sequential_storage::map::MapConfig;
 
-use crate::wifi::{WifiCredentials, wifi_task};
-
 pub mod wifi;
 
-macro_rules! create_relay {
+macro_rules! create_output {
     ($pin:expr) => {
-        Relay::new(
-            Output::new($pin, esp_hal::gpio::Level::High, OutputConfig::default()),
-            driverse::relay::ActiveLevel::Low,
-            false,
-        )
-        .unwrap()
+        Output::new($pin, esp_hal::gpio::Level::High, OutputConfig::default())
     };
 }
 
@@ -70,24 +50,18 @@ async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(config);
     // Allocate Heap for Radio/COEX
     esp_alloc::heap_allocator!(size: 131072);
-    // ivy::logger::init_mqtt_logger();
-    esp_println::logger::init_logger(log::LevelFilter::Debug);
+    ivy::logger::init_mqtt_logger();
+    // esp_println::logger::init_logger(log::LevelFilter::Debug);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_interrupt =
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
     tracing::info!("Mushclim booted");
-
+    // Init wifi
     let (wifi_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())
         .expect("Failed to initialize Wi-Fi controller");
     tracing::info!("Wifi started!");
-    let stats: HeapStats = esp_alloc::HEAP.stats();
-    // HeapStats implements the Display and defmt::Format traits, so you can
-    // pretty-print the heap stats.
-    println!("{}", stats);
-    let transport = BleConnector::new(peripherals.BT, Default::default()).unwrap();
-    let ble_controller = ExternalController::<BleConnector, 20>::new(transport);
 
     let wifi_interface = interfaces.station;
     let storage = init_storage!(
@@ -116,61 +90,61 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(net_task(runner).unwrap());
 
+    // Declare subs for device
     let (handles, config_sub) = declare_subcriptions! {
         config => "mushclim/config" : MushclimConfigDto
     };
 
+    let config_sub = config_sub.0;
+
     // NOTE: This is temporary trng workaround for esp32c5, meanwhile trng is not yet available
     let trng = rand_chacha::ChaChaRng::seed_from_u64(seed);
     let mqtt_handle =
-        ivy::actor!(spawner, MqttModule<ChaChaRng, MQTT_PAYLOAD_SIZE, 1>, MqttModule::new(stack, trng, handles))
+        ivy::actor!(spawner, MqttModule<ChaChaRng, MUSHCLIM_MQTT_PAYLOAD, 1>, MqttModule::new(stack, trng, handles))
             .unwrap();
-
-    let mut out = Output::new(
-        peripherals.GPIO4,
-        esp_hal::gpio::Level::Low,
-        OutputConfig::default().with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain),
+    // I2c for sensor
+    let i2c = I2c::new(
+        peripherals.I2C0,
+        Config::default().with_frequency(time::Rate::from_khz(100)),
     )
-    .into_flex();
-    out.set_input_enable(true);
-    let am2301 = Am2301::new(out);
+    .unwrap()
+    .with_scl(peripherals.GPIO1)
+    .with_sda(peripherals.GPIO0)
+    .into_async();
 
-    let disco = create_relay!(peripherals.GPIO5);
-    let fan = create_relay!(peripherals.GPIO6);
-
-    let lights = create_relay!(peripherals.GPIO0); //Those all are on by default
-
-    let measurement_manager = MeasurementManager::new(am2301);
+    // Try load config from nvs or create default one
     let config: MushclimConfig = storage
         .get::<MushclimConfigDto>(CONF_KEY)
         .await
         .unwrap_or(MushclimConfigDto::default())
         .as_local();
-    let exhaust = ExhaustManager::new(fan, &config);
-    let humidifier = Humidifier::new(create_relay!(peripherals.GPIO7), &config);
-    let metrics = MetricManager::new(&config);
-    // let mut mushclim: MushclimApp<'static, _> = MushclimApp {
-    //     lcd,
-    //     config,
-    //     measurement_manager,
-    //     lights,
-    //     humidifier,
-    //     disco,
-    //     exhaust,
-    //     metrics,
-    //     config_sub,
-    //     mqtt_handle,
-    //     storage,
-    // };
-    let stats: HeapStats = esp_alloc::HEAP.stats();
-    // HeapStats implements the Display and defmt::Format traits, so you can
-    // pretty-print the heap stats.
-    println!("{}", stats);
-    tracing::info!("Mushclim app was built and running!");
-    // mushclim.run().await
-    loop {
-        Timer::after_millis(5000).await;
-    }
+
+    let pins = MushclimPins::<Esp32c5Platform> {
+        light: create_output!(peripherals.GPIO25),
+        exhaust: create_output!(peripherals.GPIO7),
+        disco: create_output!(peripherals.GPIO23),
+        sensor: i2c,
+        delay: Delay,
+        humidifier: create_output!(peripherals.GPIO24),
+    };
+
+    let mut mushclim_app = MushclimApp::new(pins, config, storage, mqtt_handle, config_sub);
+
+    mushclim_app.run().await
+}
+
+struct Esp32c5Platform<'a> {
+    life: PhantomData<&'a ()>,
+}
+
+impl<'a> MushclimPlatform for Esp32c5Platform<'a> {
+    type DiscoPin = Output<'a>;
+    type ExhaustPin = Output<'a>;
+    type HumidifierPin = Output<'a>;
+    type LightPin = Output<'a>;
+    type FlashStorage = FlashStorage<'static>;
+    type Sensor = I2c<'a, Async>;
+    type Delay = Delay;
 }
 
 #[embassy_executor::task]

@@ -30,7 +30,7 @@ talky = { git = "https://github.com/Soulkau/Talky.git", tag = "v0.1", features =
 esp-hal = { version = "1.1.0", features = ["esp32c5", "unstable"] }
 esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "esp-radio", "esp32c5"] }
 
-esp-radio = { version = "0.18.0", features = ["ble", "coex", "esp-alloc", "esp32c5", "unstable", "wifi"] }
+esp-radio = { version = "0.18.0", features = ["esp-alloc", "esp32c5", "unstable", "wifi"] }
 esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c5"] }
 
 esp-println = { version = "0.18.0", features = ["esp32c5", "log-04"] }
@@ -59,7 +59,7 @@ trouble-host = "0.5.0"
 sequential-storage = "7.2.0"
 
 # Other Libraries
-driverse = { git = "https://github.com/Soulkau/Driverse.git" }
+driverse = { path = "/home/soulkau/Projects/driverse"}
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 log = { version = "0.4.29" }
