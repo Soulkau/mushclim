@@ -25,6 +25,9 @@ pub struct MushclimStats {
 
 pub const METRIC_SNAPSHOT_AMOUNT: usize = 10;
 
+/// Config structure that is used across whole app.
+///
+/// NOTE: All of duration values in config use seconds, altough it is possible to use ms, us, etc.
 #[derive(Debug)]
 pub struct MushclimConfig {
     pub humidity_threshold: RangeInclusive<u16>, //Humidity threshold, lower 86% - upper 90%
@@ -37,13 +40,17 @@ pub struct MushclimConfig {
     pub exhaust_duty: Duration,                //Exhaust duty duration
     pub exhaust_duty_interval: Duration,       //Interval between exhaust duty cycles
     pub loop_delay: Duration,                  //Tick/loop frequency
-    pub metric_send_period: Duration,
+    pub metric_send_period: Duration,          //How much time should pass until metric is sent
 }
 
-/// All of duration values in config use seconds.
+/// Dto of `MushclimConfig`.
+/// As `MushclimConfig` uses embassy and other local types for ergonomics, so it cannot be serialized easily.
+///
+/// NOTE: All of duration values in config use seconds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MushclimConfigDto {
+    /// Currently unsuported, field that used for ota config updates, defines if reset is *hard or *soft.
     pub preserve: bool,
     pub humidity_lower_bound: u16,
     pub humidity_upper_bound: u16,
