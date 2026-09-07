@@ -15,24 +15,6 @@ pub mod metrics;
 pub mod timer;
 extern crate alloc;
 
-#[macro_export]
-macro_rules! arcmutex {
-    ($val:expr) => {{
-        use alloc::sync::Arc;
-        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
-
-        Arc::new(Mutex::<CriticalSectionRawMutex, _>::new($val))
-    }};
-}
-
-#[macro_export]
-macro_rules! mk_static {
-    ($t:ty, $val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        STATIC_CELL.init(($val))
-    }};
-}
-
 #[derive(Debug, Serialize)]
 pub struct MushclimStats {
     pub temperature: i16,
