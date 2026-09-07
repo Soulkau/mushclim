@@ -46,14 +46,14 @@ pub struct MushclimApp<P: MushclimPlatform> {
     metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
     mqtt_handle: MushclimMqttHandle,
-    storage: StorageModule<P::FlashStorage>,
+    storage: StorageModule<P::NvsStorage>,
 }
 
 impl<P: MushclimPlatform> MushclimApp<P> {
     pub fn new(
         pins: MushclimPins<P>,
         config: MushclimConfig,
-        storage: StorageModule<P::FlashStorage>,
+        storage: StorageModule<P::NvsStorage>,
         mqtt_handle: MushclimMqttHandle,
         config_sub: Subscription<MushclimConfigDto>,
     ) -> Self {

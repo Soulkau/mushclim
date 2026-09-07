@@ -97,13 +97,16 @@ impl MushclimConfigDto {
         }
     }
 }
-
+/// Used by chips to provide support for mushclim.
 pub trait MushclimPlatform {
     type ExhaustPin: OutputPin;
     type LightPin: OutputPin;
+    // Blue led lights, optional
     type DiscoPin: OutputPin;
     type HumidifierPin: OutputPin;
-    type FlashStorage: NorFlash + 'static;
+    // Persistent(nvs) flash region
+    type NvsStorage: NorFlash + 'static;
+    // Stcc4
     type Sensor: I2c;
     type Delay: DelayNs;
 }

@@ -14,7 +14,6 @@ use crate::wifi::{WifiCredentials, wifi_task};
 use alloc::boxed::Box;
 use embassy_executor::Spawner;
 use embassy_net::{Runner, StackResources};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::Delay;
 use embedded_tls::TlsConfig;
 use esp_backtrace as _;
@@ -35,7 +34,6 @@ use mushclim::{MushclimConfig, MushclimConfigDto, MushclimPlatform};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use sequential_storage::map::MapConfig;
-use static_cell::StaticCell;
 
 pub mod wifi;
 
@@ -176,7 +174,7 @@ impl<'a> MushclimPlatform for Esp32c5Platform<'a> {
     type ExhaustPin = Output<'a>;
     type HumidifierPin = Output<'a>;
     type LightPin = Output<'a>;
-    type FlashStorage = FlashStorage<'static>;
+    type NvsStorage = FlashStorage<'static>;
     type Sensor = I2c<'a, Async>;
     type Delay = Delay;
 }
