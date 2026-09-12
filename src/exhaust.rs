@@ -90,6 +90,31 @@ impl ExhaustState {
             }
         }
     }
+
+    pub fn as_log(&self) -> String<32> {
+        let mut buf = String::new();
+        match self {
+            ExhaustState::Idle => {
+                let _ = write!(buf, "Idle");
+            }
+            ExhaustState::Runnning(timer) => {
+                let _ = write!(
+                    buf,
+                    "Running (due: {})",
+                    timer.time_remaining().pretty_string()
+                );
+            }
+            ExhaustState::Cooldown(timer) => {
+                let _ = write!(
+                    buf,
+                    "Cooldown (due: {})",
+                    timer.time_remaining().pretty_string()
+                );
+            }
+        }
+
+        buf
+    }
 }
 
 enum Mode {
@@ -166,19 +191,14 @@ impl<P: OutputPin> ExhaustManager<P> {
     pub fn is_turned_on(&self) -> bool {
         self.exhaust.is_on()
     }
-    pub fn reset(&mut self) {
-        self.exhaust.off().ok();
-    }
+
     pub fn force_config(&mut self, config: &MushclimConfig) {
         self.exhaust_config = config.exhaust.clone();
     }
 
     pub fn state_log(&self) -> String<32> {
         match &self.mode {
-            Mode::Measurement { .. } => {
-                /* your existing display logic */
-                todo!()
-            }
+            Mode::Measurement { state } => state.as_log(),
             Mode::Cycle { cycle_timer } => {
                 let (is_on_duty, until_switch) = cycle_timer.time_until_change();
                 let state = if is_on_duty { "off" } else { "on" };

@@ -124,6 +124,15 @@ impl DueTimer {
         }
         true
     }
+
+    pub fn time_remaining(&self) -> Duration {
+        let now = Instant::now();
+        if now >= self.next_due {
+            Duration::from_ticks(0)
+        } else {
+            self.next_due - now
+        }
+    }
 }
 
 pub(crate) trait DurationExts {
