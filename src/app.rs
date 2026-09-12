@@ -7,12 +7,12 @@ use ivy::{
 };
 
 use crate::{
-    MushclimConfig, MushclimConfigDto, MushclimPlatform, MushclimStats,
+    MushclimPlatform, MushclimStats,
+    config::{MushclimConfig, MushclimConfigDto},
     exhaust::ExhaustManager,
     humidifier::Humidifier,
     measurements::{Measurement, MeasurementError, MeasurementManager},
     metrics::MetricManager,
-    timer::CycleTimer,
 };
 
 const CONF_KEY: StorageKey = StorageKey::new(101);
@@ -59,9 +59,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     ) -> Self {
         Self {
             measurement_manager: MeasurementManager::new(Stcc4::new(pins.sensor, pins.delay)),
-            exhaust: ExhaustManager::new(create_relay!(pins.exhaust), &config),
+            exhaust: ExhaustManager::new(create_relay!(pins.exhaust), &config.exhaust),
             lights: create_relay!(pins.light),
-            humidifier: Humidifier::new(create_relay!(pins.humidifier), &config),
+            humidifier: Humidifier::new(create_relay!(pins.humidifier), &config.humidifier),
             disco: create_relay!(pins.disco),
             metrics: MetricManager::new(&config),
             config,
@@ -77,8 +77,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
 
         tracing::info!("[MushclimApp] Starting sensor calibration");
         self.measurement_manager.init().await;
-
-        self.exhaust.timer.ingore_tick();
+        tracing::info!("[MushclimApp] Finished sensor calibration");
         let mut ticker = Ticker::every(self.config.loop_delay);
 
         loop {
@@ -98,7 +97,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             }
         }
     }
-
+    /// Update configs for everyone
     async fn hard_config_update(&mut self, config: MushclimConfig) {
         self.config = config;
         self.exhaust.force_config(&self.config);
@@ -106,14 +105,12 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.humidifier.force_config(&self.config);
         tracing::info!("[MushclimApp] Hard config update performed");
     }
-
+    ///Tick app single time.
     async fn tick_step(&mut self) {
-        self.exhaust.tick().await;
-
-        match self.acquire_safe_measurement().await {
+        match self.acquire_measurement().await {
             Some(measurements) => {
                 self.metrics.feed(measurements, &self.mqtt_handle).await;
-
+                self.exhaust.tick_with_measurements(&measurements);
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
                 self.log_app_state(measurements).await;
@@ -122,21 +119,19 @@ impl<P: MushclimPlatform> MushclimApp<P> {
                 tracing::error!(
                     "[MushclimApp] CRITICAL: Sensor totally failed or reading is permanently erratic"
                 );
-                self.enter_safe_mode(1).await;
+                self.sensor_failure_mode().await;
             }
         }
     }
 
-    async fn acquire_safe_measurement(&mut self) -> Option<Measurement> {
-        // Attempt up to 5 times to get a stable, validated reading
+    /// Attempts to get measurement, will retry `config.retry_count` times, before giving up.
+    async fn acquire_measurement(&mut self) -> Option<Measurement> {
         for attempt in 1..=self.config.retry_count {
-            match self.measurement_manager.measure(&self.config).await {
+            match self.measurement_manager.measure().await {
                 Ok(stats) => {
-                    // It passed hardware check AND history check!
                     return Some(stats);
                 }
                 Err(MeasurementError::Sensor) => {
-                    // "Замерить датчик -> err -> попробовать еще раз (5 попыток)"
                     tracing::warn!("Hardware read error on attempt {}. Retrying...", attempt);
                     Timer::after_secs(2).await;
                 }
@@ -149,40 +144,14 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         None
     }
 
-    async fn enter_safe_mode(&mut self, code: u32) -> ! {
-        tracing::error!("Entering safemode, errcode: {}", code);
-
-        self.humidifier.turn_off();
-        self.exhaust.reset();
-
-        let mut humidity_timer = CycleTimer::new(
-            self.config.safe_humidity_duty_interval,
-            self.config.safe_humidity_duty,
-        );
+    async fn sensor_failure_mode(&mut self) -> ! {
+        self.exhaust.switch_to_cycle();
+        self.humidifier.set_cycled_mode();
 
         loop {
-            self.exhaust.tick().await;
+            let exhaust_on = self.exhaust.tick_cycle();
 
-            let humidifier_on = if self.exhaust.is_turned_on() && humidity_timer.duty_started() {
-                humidity_timer.ingore_tick();
-                if self.humidifier.is_on() {
-                    tracing::info!("[SafeMode]: humidifier is on along exhaust, turning off");
-                    self.humidifier.turn_off();
-                }
-                false
-            } else {
-                humidity_timer.tick()
-            };
-
-            if humidifier_on != self.humidifier.is_on() {
-                if humidifier_on {
-                    tracing::info!("[SafeMode]: Humidifer is on");
-                    self.humidifier.turn_on();
-                } else {
-                    tracing::info!("[SafeMode]: Humidifer is off");
-                    self.humidifier.turn_off();
-                }
-            }
+            self.humidifier.tick_cycled(exhaust_on);
 
             Timer::after(self.config.loop_delay).await;
         }
