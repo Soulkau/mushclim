@@ -192,6 +192,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         let stats = MushclimStats {
             temperature: measurements.temperature_c as i16,
             humidity: measurements.humidity_pct as u16,
+            co2ppm: measurements.co2_ppm,
             exhaust_on: self.exhaust.is_turned_on(),
             humidifier_on: self.humidifier.is_on(),
         };
@@ -202,6 +203,6 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             stats.humidifier_on,
             self.exhaust.state_log()
         );
-        self.mqtt_handle.publish("mushclim/stats", stats).await;
+        self.mqtt_handle.publish("mushclim/stats", stats).await.ok();
     }
 }

@@ -19,6 +19,7 @@ extern crate alloc;
 pub struct MushclimStats {
     pub temperature: i16,
     pub humidity: u16,
+    pub co2ppm: u16,
     pub humidifier_on: bool,
     pub exhaust_on: bool,
 }
