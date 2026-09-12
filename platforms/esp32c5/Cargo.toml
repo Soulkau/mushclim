@@ -24,7 +24,6 @@ opt-level = 's'
 overflow-checks = false
 
 [dependencies]
-ivy = { path = "/home/soulkau/Projects/ivy" }
 talky = { git = "https://github.com/Soulkau/Talky.git", tag = "v0.1", features = ["devices", "macros"] }
 
 esp-hal = { version = "1.1.0", features = ["esp32c5", "unstable"] }

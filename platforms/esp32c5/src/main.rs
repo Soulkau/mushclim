@@ -25,13 +25,13 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{Async, time};
 use esp_radio::wifi::Interface;
 use esp_storage::FlashStorage;
-use ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
-use ivy::storage::StorageKey;
-use ivy::{count, declare_subcriptions, init_storage, mk_static};
 use mushclim::MushclimPlatform;
 use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
 use mushclim::app::{MushclimApp, MushclimPins};
 use mushclim::config::MushclimConfigDto;
+use mushclim::ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
+use mushclim::ivy::storage::StorageKey;
+use mushclim::ivy::{count, declare_subcriptions, init_storage, mk_static};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use sequential_storage::map::MapConfig;
@@ -68,8 +68,8 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 68 * 1024);
 
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-    ivy::logger::init_mqtt_logger();
-    // esp_println::logger::init_logger(log::LevelFilter::Debug);
+    // ivy::logger::init_mqtt_logger();
+    esp_println::logger::init_logger(log::LevelFilter::Debug);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_interrupt =
@@ -118,7 +118,7 @@ async fn main(spawner: Spawner) -> ! {
     // NOTE: This is temporary trng workaround for esp32c5, meanwhile trng is not yet available
     let trng = rand_chacha::ChaChaRng::seed_from_u64(seed);
 
-    let mqtt_handle = ivy::actor!(
+    let mqtt_handle = mushclim::ivy::actor!(
         spawner,
         MushclimMqtt,
         MushclimMqtt::new(

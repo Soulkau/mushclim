@@ -1822,51 +1822,11 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "ivy"
 version = "0.1.0"
-dependencies = [
- "ivy-core 0.1.0",
- "ivy-macros 0.1.0",
- "ivy-types 0.1.0",
-]
-
-[[package]]
-name = "ivy"
-version = "0.1.0"
 source = "git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2#35bd8b6f26925d719b4007c2a8ff2ac3910030c5"
 dependencies = [
- "ivy-core 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
- "ivy-macros 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
- "ivy-types 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
-]
-
-[[package]]
-name = "ivy-core"
-version = "0.1.0"
-dependencies = [
- "const_panic",
- "embassy-embedded-hal",
- "embassy-executor 0.10.0",
- "embassy-futures",
- "embassy-net",
- "embassy-sync 0.7.2",
- "embassy-time",
- "embedded-storage",
- "embedded-storage-async",
- "embedded-tls",
- "heapless 0.9.3",
- "ivy-macros 0.1.0",
- "ivy-types 0.1.0",
- "mqttrust",
- "paste",
- "pin-project",
- "postcard",
- "sequential-storage",
- "serde",
- "serde-json-core",
- "serde_json",
- "static_cell",
- "talky",
- "thiserror",
- "tracing",
+ "ivy-core",
+ "ivy-macros",
+ "ivy-types",
 ]
 
 [[package]]
@@ -1885,8 +1845,8 @@ dependencies = [
  "embedded-storage-async",
  "embedded-tls",
  "heapless 0.9.3",
- "ivy-macros 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
- "ivy-types 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
+ "ivy-macros",
+ "ivy-types",
  "mqttrust",
  "paste",
  "pin-project",
@@ -1904,37 +1864,15 @@ dependencies = [
 [[package]]
 name = "ivy-macros"
 version = "0.1.0"
-dependencies = [
- "embassy-executor 0.10.0",
- "heck",
- "ivy-types 0.1.0",
- "proc-macro2",
- "quote",
- "static_cell",
- "syn 3.0.4",
-]
-
-[[package]]
-name = "ivy-macros"
-version = "0.1.0"
 source = "git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2#35bd8b6f26925d719b4007c2a8ff2ac3910030c5"
 dependencies = [
  "embassy-executor 0.10.0",
  "heck",
- "ivy-types 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
+ "ivy-types",
  "proc-macro2",
  "quote",
  "static_cell",
  "syn 3.0.4",
-]
-
-[[package]]
-name = "ivy-types"
-version = "0.1.0"
-dependencies = [
- "embassy-executor 0.10.0",
- "embassy-sync 0.7.2",
- "serde",
 ]
 
 [[package]]
@@ -2134,7 +2072,7 @@ dependencies = [
  "embedded-time",
  "embedded-tls",
  "heapless 0.9.3",
- "ivy 0.1.0 (git+https://github.com/Soulkau/Ivy.git?tag=v0.2.2)",
+ "ivy",
  "jiff",
  "log",
  "nb 1.1.0",
@@ -2185,7 +2123,6 @@ dependencies = [
  "esp-rtos",
  "esp-storage",
  "heapless 0.9.3",
- "ivy 0.1.0",
  "jiff",
  "log",
  "mushclim",

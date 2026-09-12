@@ -14,6 +14,8 @@ pub mod metrics;
 pub mod timer;
 extern crate alloc;
 
+pub use ivy;
+
 #[derive(Debug, Serialize)]
 pub struct MushclimStats {
     pub temperature: i16,
