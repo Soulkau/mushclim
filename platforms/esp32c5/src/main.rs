@@ -123,6 +123,7 @@ async fn main(spawner: Spawner) -> ! {
         MushclimMqtt,
         MushclimMqtt::new(
             "mushdev",
+            "mushclim/log",
             stack,
             handles,
             leak(MqttState::new()),
