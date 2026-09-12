@@ -28,9 +28,10 @@ use esp_storage::FlashStorage;
 use ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
 use ivy::storage::StorageKey;
 use ivy::{count, declare_subcriptions, init_storage, mk_static};
+use mushclim::MushclimPlatform;
 use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
 use mushclim::app::{MushclimApp, MushclimPins};
-use mushclim::{MushclimConfig, MushclimConfigDto, MushclimPlatform};
+use mushclim::config::MushclimConfigDto;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use sequential_storage::map::MapConfig;
@@ -142,13 +143,6 @@ async fn main(spawner: Spawner) -> ! {
     .with_sda(peripherals.GPIO0)
     .into_async();
 
-    // Try load config from nvs or create default one
-    let config: MushclimConfig = storage
-        .get::<MushclimConfigDto>(CONF_KEY)
-        .await
-        .unwrap_or(MushclimConfigDto::default())
-        .as_local();
-
     let pins = MushclimPins::<Esp32c5Platform> {
         light: create_output!(peripherals.GPIO25),
         exhaust: create_output!(peripherals.GPIO7),
@@ -160,7 +154,7 @@ async fn main(spawner: Spawner) -> ! {
 
     tracing::info!("heapstats {}", esp_alloc::HEAP.stats());
 
-    let mut mushclim_app = MushclimApp::new(pins, config, storage, mqtt_handle, config_sub);
+    let mut mushclim_app = MushclimApp::init(pins, storage, mqtt_handle, config_sub).await;
 
     mushclim_app.run().await
 }

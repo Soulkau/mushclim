@@ -50,13 +50,18 @@ pub struct MushclimApp<P: MushclimPlatform> {
 }
 
 impl<P: MushclimPlatform> MushclimApp<P> {
-    pub fn new(
+    pub async fn init(
         pins: MushclimPins<P>,
-        config: MushclimConfig,
         storage: StorageModule<P::NvsStorage>,
         mqtt_handle: MushclimMqttHandle,
         config_sub: Subscription<MushclimConfigDto>,
     ) -> Self {
+        let config = storage
+            .get::<MushclimConfigDto>(CONF_KEY)
+            .await
+            .unwrap_or(MushclimConfigDto::default())
+            .as_local();
+
         Self {
             measurement_manager: MeasurementManager::new(Stcc4::new(pins.sensor, pins.delay)),
             exhaust: ExhaustManager::new(create_relay!(pins.exhaust), &config.exhaust),
