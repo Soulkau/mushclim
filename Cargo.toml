@@ -2,7 +2,7 @@
 edition = "2024"
 name = "mushclim"
 rust-version = "1.88"
-version = "0.1.0"
+version = "0.3.0"
 
 [lib]
 test = false
