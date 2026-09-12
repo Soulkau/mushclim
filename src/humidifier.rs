@@ -3,7 +3,28 @@ use core::ops::RangeInclusive;
 use driverse::relay::Relay;
 use embedded_hal::digital::OutputPin;
 
-use crate::{MushclimConfig, measurements::Measurement};
+use crate::{
+    config::{MushclimConfig, MushclimConfigDto},
+    measurements::Measurement,
+    timer::CycleTimer,
+};
+
+#[derive(Debug, Clone)]
+pub struct HumidifierConfig {
+    pub humidity_threshold: RangeInclusive<u16>,
+    pub safe_humidity_duty_interval: Duration,
+    pub safe_humidity_duty: Duration,
+}
+
+impl From<&MushclimConfigDto> for HumidifierConfig {
+    fn from(dto: &MushclimConfigDto) -> Self {
+        Self {
+            humidity_threshold: dto.humidity_lower_bound..=dto.humidity_upper_bound,
+            safe_humidity_duty_interval: Duration::from_secs(dto.safe_humidity_duty_interval),
+            safe_humidity_duty: Duration::from_secs(dto.safe_humidity_duty),
+        }
+    }
+}
 
 pub(crate) struct Humidifier<P: OutputPin> {
     switch: Relay<P>,

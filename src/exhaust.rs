@@ -1,24 +1,39 @@
 use crate::{
-    MushclimConfig,
-    timer::{CycleTimer, DurationExts},
+    config::{MushclimConfig, MushclimConfigDto},
+    measurements::Measurement,
+    timer::{CycleTimer, DueTimer, DurationExts},
 };
 use core::fmt::Write;
 use driverse::relay::Relay;
+use embassy_time::Duration;
 use embedded_hal::digital::OutputPin;
 use heapless::String;
 
 pub struct ExhaustManager<P: OutputPin> {
     pub exhaust: Relay<P>,
     pub timer: CycleTimer,
+#[derive(Debug, Clone)]
+pub struct ExhaustConfig {
+    pub co2pmm_treshold: RangeInclusive<u16>,
+    pub exhaust_cooldown: Duration,
+    pub exhaust_timeout: Duration,
+    pub safe_exhaust_duty: Duration,
+    pub safe_exhaust_duty_interval: Duration,
 }
 
 impl<P: OutputPin> ExhaustManager<P> {
     pub fn new(exhaust: Relay<P>, config: &MushclimConfig) -> Self {
+impl From<&MushclimConfigDto> for ExhaustConfig {
+    fn from(dto: &MushclimConfigDto) -> Self {
         Self {
-            exhaust,
-            timer: CycleTimer::new(config.exhaust_duty_interval, config.exhaust_duty),
+            co2pmm_treshold: dto.co2ppm_lower_bound..=dto.co2ppm_upper_bound,
+            exhaust_cooldown: Duration::from_secs(dto.exhaust_cooldown),
+            exhaust_timeout: Duration::from_secs(dto.exhaust_timeout),
+            safe_exhaust_duty: Duration::from_secs(dto.safe_exhaust_duty),
+            safe_exhaust_duty_interval: Duration::from_secs(dto.safe_exhaust_duty_interval),
         }
     }
+}
 
     pub async fn tick(&mut self) -> bool {
         let should_be_on = self.timer.tick();

@@ -103,7 +103,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.config = config;
         self.exhaust.force_config(&self.config);
         self.metrics.force_config(&self.config);
-        self.humidifier.update_config(&self.config);
+        self.humidifier.force_config(&self.config);
         tracing::info!("[MushclimApp] Hard config update performed");
     }
 

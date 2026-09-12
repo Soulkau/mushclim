@@ -3,8 +3,6 @@ use core::fmt::Debug;
 use driverse::stcc4::{self, Stcc4};
 use embedded_hal_async::{delay::DelayNs, i2c::I2c};
 
-use crate::MushclimConfig;
-
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum MeasurementError {
     #[error("sensor communication failed")]
@@ -53,7 +51,7 @@ impl<I: I2c, D: DelayNs> MeasurementManager<I, D> {
         self.sensor.perform_conditioning().await.ok();
     }
 
-    pub async fn measure(&mut self, _: &MushclimConfig) -> Result<Measurement, MeasurementError> {
+    pub async fn measure(&mut self) -> Result<Measurement, MeasurementError> {
         let sm = self.sensor.measure().await?;
 
         Ok(sm.into())

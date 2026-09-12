@@ -1,6 +1,6 @@
 use crate::{
-    METRIC_SNAPSHOT_AMOUNT, MushclimConfig, app::MushclimMqttHandle, measurements::Measurement,
-    timer::DueTimer,
+    METRIC_SNAPSHOT_AMOUNT, app::MushclimMqttHandle, config::MushclimConfig,
+    measurements::Measurement, timer::DueTimer,
 };
 use embassy_time::Instant;
 use heapless::HistoryBuf;
