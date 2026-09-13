@@ -30,7 +30,6 @@ use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
 use mushclim::app::{MushclimApp, MushclimPins};
 use mushclim::config::MushclimConfigDto;
 use mushclim::ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
-use mushclim::ivy::storage::StorageKey;
 use mushclim::ivy::{count, declare_subcriptions, init_storage, mk_static};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
@@ -56,7 +55,6 @@ type MushclimMqtt = MqttModule<
     TCP_BUFFER_SIZE,
     TLS_BUFFER_SIZE,
 >;
-const CONF_KEY: StorageKey = StorageKey::new(101);
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -68,8 +66,8 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 68 * 1024);
 
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-    // ivy::logger::init_mqtt_logger();
-    esp_println::logger::init_logger(log::LevelFilter::Debug);
+    mushclim::ivy::logger::init_mqtt_logger();
+    //esp_println::logger::init_logger(log::LevelFilter::Debug);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_interrupt =
@@ -148,9 +146,9 @@ async fn main(spawner: Spawner) -> ! {
         light: create_output!(peripherals.GPIO25),
         exhaust: create_output!(peripherals.GPIO7),
         disco: create_output!(peripherals.GPIO23),
+        humidifier: create_output!(peripherals.GPIO24),
         sensor: i2c,
         delay: Delay,
-        humidifier: create_output!(peripherals.GPIO24),
     };
 
     tracing::info!("heapstats {}", esp_alloc::HEAP.stats());
