@@ -25,11 +25,20 @@ pub(crate) struct Metric {
     pub samples: u32,
 }
 /// Structure that accamulates values, and calculates finished `Stat`
-#[derive(Default)]
 struct UnfinishedStat {
     min: f32,
     max: f32,
     sum: f32,
+}
+
+impl Default for UnfinishedStat {
+    fn default() -> Self {
+        Self {
+            min: f32::MAX,
+            max: f32::MIN,
+            sum: 0.0,
+        }
+    }
 }
 
 impl UnfinishedStat {
