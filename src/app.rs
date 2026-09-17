@@ -2,8 +2,8 @@ use driverse::{relay::Relay, stcc4::Stcc4};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Ticker, Timer};
 use ivy::{
+    flash::{FlashStorage, StorageKey},
     mqtt::{MqttHandle, Subscription},
-    storage::{StorageKey, StorageModule},
 };
 
 use crate::{
@@ -46,13 +46,13 @@ pub struct MushclimApp<P: MushclimPlatform> {
     metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
     mqtt_handle: MushclimMqttHandle,
-    storage: StorageModule<P::NvsStorage>,
+    storage: FlashStorage<P::NvsStorage>,
 }
 
 impl<P: MushclimPlatform> MushclimApp<P> {
     pub async fn init(
         pins: MushclimPins<P>,
-        storage: StorageModule<P::NvsStorage>,
+        storage: FlashStorage<P::NvsStorage>,
         mqtt_handle: MushclimMqttHandle,
         config_sub: Subscription<MushclimConfigDto>,
     ) -> Self {
