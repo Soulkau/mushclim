@@ -9,6 +9,7 @@
 
 extern crate alloc;
 use core::marker::PhantomData;
+use core::ops::Range;
 
 use crate::wifi::{WifiCredentials, wifi_task};
 use alloc::boxed::Box;
@@ -30,10 +31,9 @@ use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
 use mushclim::app::{MushclimApp, MushclimPins};
 use mushclim::config::MushclimConfigDto;
 use mushclim::ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
-use mushclim::ivy::{count, declare_subcriptions, init_storage, mk_static};
+use mushclim::ivy::{count, declare_subcriptions, init_flash, init_storage, mk_static};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
-use sequential_storage::map::MapConfig;
 
 pub mod wifi;
 
@@ -58,6 +58,8 @@ type MushclimMqtt = MqttModule<
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
+const NVS_RANGE: Range<u32> = 0x9000..0xF000;
+
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -80,12 +82,8 @@ async fn main(spawner: Spawner) -> ! {
     tracing::info!("Wifi started!");
 
     let wifi_interface = interfaces.station;
-    let storage = init_storage!(
-        FlashStorage,
-        FlashStorage::new(peripherals.FLASH),
-        MapConfig::new(0x9000..0xF000)
-    );
-    // let device_meta = DeviceMetadata::load(&storage, talky::device::DeviceType::MushClimate).await;
+    let flash = init_flash!(FlashStorage, FlashStorage::new(peripherals.FLASH));
+    let storage = init_storage!(FlashStorage, flash.partition(NVS_RANGE));
 
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
