@@ -1,5 +1,5 @@
 [target.riscv32imac-unknown-none-elf]
-runner = "espflash flash --monitor --chip esp32c5"
+runner = "espflash flash --monitor --chip esp32c5 --partition-table partitions.csv --erase-parts otadata"
 rustflags = [
   # --- KEEP existing `link-arg` flags ---
 
