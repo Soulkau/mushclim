@@ -1822,6 +1822,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "ivy"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?rev=05dd457#05dd457b76d38e19240687a4a78c0b8c89055c88"
 dependencies = [
  "ivy-core",
  "ivy-macros",
@@ -1831,6 +1832,7 @@ dependencies = [
 [[package]]
 name = "ivy-core"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?rev=05dd457#05dd457b76d38e19240687a4a78c0b8c89055c88"
 dependencies = [
  "const_panic",
  "embassy-embedded-hal",
@@ -1862,6 +1864,7 @@ dependencies = [
 [[package]]
 name = "ivy-macros"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?rev=05dd457#05dd457b76d38e19240687a4a78c0b8c89055c88"
 dependencies = [
  "embassy-executor 0.10.0",
  "heck",
@@ -1875,6 +1878,7 @@ dependencies = [
 [[package]]
 name = "ivy-types"
 version = "0.1.0"
+source = "git+https://github.com/Soulkau/Ivy.git?rev=05dd457#05dd457b76d38e19240687a4a78c0b8c89055c88"
 dependencies = [
  "embassy-executor 0.10.0",
  "embassy-sync 0.7.2",
@@ -2080,7 +2084,6 @@ dependencies = [
  "sha2",
  "smoltcp 0.12.0",
  "static_cell",
- "talky",
  "thiserror",
  "tracing",
  "trouble-host",
@@ -2132,7 +2135,6 @@ dependencies = [
  "sha2",
  "smoltcp 0.12.0",
  "static_cell",
- "talky",
  "thiserror",
  "tracing",
  "trouble-host",
@@ -2943,8 +2945,6 @@ version = "0.1.0"
 source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
 dependencies = [
  "talky-core",
- "talky-devices",
- "talky-macros",
  "talky-types",
 ]
 
@@ -2976,49 +2976,6 @@ dependencies = [
  "talky-types",
  "thiserror",
  "ufmt",
-]
-
-[[package]]
-name = "talky-devices"
-version = "0.1.0"
-source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
-dependencies = [
- "anyhow",
- "async-trait",
- "bitflags 2.13.1",
- "const-hex",
- "ed25519-dalek",
- "enum_dispatch",
- "futures",
- "heapless 0.9.3",
- "hmac",
- "hmac-sha256",
- "jiff",
- "log",
- "paste",
- "postcard",
- "rand 0.9.5",
- "serde",
- "serde_json",
- "sha2",
- "static_cell",
- "talky-macros",
- "talky-types",
- "thiserror",
- "ufmt",
-]
-
-[[package]]
-name = "talky-macros"
-version = "0.1.0"
-source = "git+https://github.com/Soulkau/Talky.git?tag=v0.1#f73f8effc2af46d2682e97c7f4d3f3f91423ee21"
-dependencies = [
- "heck",
- "log",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
- "talky-types",
 ]
 
 [[package]]
