@@ -30,10 +30,16 @@ use mushclim::MushclimPlatform;
 use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
 use mushclim::app::{MushclimApp, MushclimPins};
 use mushclim::config::MushclimConfigDto;
-use mushclim::ivy::mqtt::{MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState};
-use mushclim::ivy::{count, declare_subcriptions, init_flash, init_storage, mk_static};
+use mushclim::ivy::logger::init_subscriber;
+use mushclim::ivy::mqtt::{
+    MqttLogger, MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState,
+};
+use mushclim::ivy::{
+    count, declare_subcriptions, init_flash, init_logger, init_storage, mk_static,
+};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
+use tracing::Level;
 
 pub mod wifi;
 
@@ -47,14 +53,7 @@ static TCP_BUFFER_SIZE: usize = 9984;
 
 static TLS_BUFFER_SIZE: usize = 16640;
 
-type MushclimMqtt = MqttModule<
-    ChaChaRng,
-    MUSHCLIM_MQTT_PAYLOAD,
-    1,
-    TCP_BUFFER_SIZE,
-    TCP_BUFFER_SIZE,
-    TLS_BUFFER_SIZE,
->;
+type MushclimMqtt = MqttModule<ChaChaRng, 1, TCP_BUFFER_SIZE, TCP_BUFFER_SIZE, TLS_BUFFER_SIZE>;
 // This creates a default app-descriptor required by the esp-idf bootloader.
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -68,7 +67,6 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 68 * 1024);
 
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-    mushclim::ivy::logger::init_mqtt_logger();
     //esp_println::logger::init_logger(log::LevelFilter::Debug);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -119,7 +117,6 @@ async fn main(spawner: Spawner) -> ! {
         MushclimMqtt,
         MushclimMqtt::new(
             "mushdev",
-            "mushclim/log",
             stack,
             handles,
             leak(MqttState::new()),
@@ -130,6 +127,14 @@ async fn main(spawner: Spawner) -> ! {
         )
     )
     .unwrap();
+
+    init_logger!(
+        spawner,
+        MqttLogger::new("mushclim/dev/logs", mqtt_handle.clone()),
+        init_subscriber(Level::INFO),
+        MqttLogger
+    );
+
     // I2c for sensor
     let i2c = I2c::new(
         peripherals.I2C0,
@@ -151,7 +156,7 @@ async fn main(spawner: Spawner) -> ! {
 
     tracing::info!("heapstats {}", esp_alloc::HEAP.stats());
 
-    let mut mushclim_app = MushclimApp::init(pins, storage, mqtt_handle, config_sub).await;
+    let mut mushclim_app = MushclimApp::init(pins, storage, mqtt_handle.into(), config_sub).await;
 
     mushclim_app.run().await
 }

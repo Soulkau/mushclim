@@ -3,7 +3,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Ticker, Timer};
 use ivy::{
     flash::{FlashStorage, StorageKey},
-    mqtt::{MqttHandle, Subscription},
+    mqtt::{SizedMqttHandle, Subscription},
 };
 
 use crate::{
@@ -19,7 +19,7 @@ const CONF_KEY: StorageKey = StorageKey::new(101);
 
 pub const MUSHCLIM_MQTT_PAYLOAD: usize = 512;
 
-pub type MushclimMqttHandle = MqttHandle<MUSHCLIM_MQTT_PAYLOAD>;
+pub type MushclimMqttHandle = SizedMqttHandle<MUSHCLIM_MQTT_PAYLOAD>;
 
 macro_rules! create_relay {
     ($pin:expr) => {
