@@ -8,9 +8,10 @@ use serde::Serialize;
 pub mod app;
 pub mod config;
 pub mod exhaust;
-pub mod humidifier;
-pub mod measurements;
-pub mod timer;
+mod heater;
+mod humidifier;
+mod measurements;
+mod timer;
 extern crate alloc;
 
 pub use ivy;
@@ -30,8 +31,7 @@ pub const METRIC_SNAPSHOT_AMOUNT: usize = 10;
 pub trait MushclimPlatform {
     type ExhaustPin: OutputPin;
     type LightPin: OutputPin;
-    // Blue led lights, optional
-    type DiscoPin: OutputPin;
+    type HeaterPin: OutputPin;
     type HumidifierPin: OutputPin;
     // Persistent(nvs) flash region
     type NvsStorage: NorFlash + 'static;

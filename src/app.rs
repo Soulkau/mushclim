@@ -10,6 +10,7 @@ use crate::{
     MushclimPlatform, MushclimStatus,
     config::{MushclimConfig, MushclimConfigDto},
     exhaust::Exhaust,
+    heater::Heater,
     humidifier::Humidifier,
     measurements::{Measurement, MeasurementError, MeasurementManager},
 };
@@ -29,7 +30,7 @@ macro_rules! create_relay {
 pub struct MushclimPins<P: MushclimPlatform> {
     pub exhaust: P::ExhaustPin,
     pub light: P::LightPin,
-    pub disco: P::DiscoPin,
+    pub disco: P::HeaterPin,
     pub humidifier: P::HumidifierPin,
     pub sensor: P::Sensor,
     pub delay: P::Delay,
@@ -41,7 +42,7 @@ pub struct MushclimApp<P: MushclimPlatform> {
     config: MushclimConfig,
     lights: Relay<P::LightPin>,
     humidifier: Humidifier<P::HumidifierPin>,
-    disco: Relay<P::DiscoPin>,
+    heater: Heater<P::HeaterPin>,
     config_sub: Subscription<MushclimConfigDto>,
     mqtt_handle: MushclimMqttHandle,
     storage: FlashStorage<P::NvsStorage>,
@@ -65,7 +66,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             exhaust: Exhaust::new(create_relay!(pins.exhaust), &config.exhaust),
             lights: create_relay!(pins.light),
             humidifier: Humidifier::new(create_relay!(pins.humidifier), &config.humidifier),
-            disco: create_relay!(pins.disco),
+            heater: Heater::new(create_relay!(pins.disco), &config.heater),
             config,
             config_sub,
             mqtt_handle,
@@ -75,7 +76,6 @@ impl<P: MushclimPlatform> MushclimApp<P> {
 
     pub async fn run(&mut self) -> ! {
         self.lights.on().ok();
-        self.disco.on().ok();
 
         tracing::info!(tag = "app", "starting sensor calibration");
         self.measurement_manager.init().await;
@@ -105,11 +105,13 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.config = config;
         self.exhaust.force_config(&self.config);
         self.humidifier.force_config(&self.config);
+        self.heater.force_config(&self.config);
     }
     ///Tick app single time.
     async fn tick_step(&mut self) {
         match self.acquire_measurement().await {
             Some(measurements) => {
+                self.heater.tick(&measurements);
                 self.exhaust.tick_with_measurements(&measurements);
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
@@ -155,6 +157,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     async fn sensor_failure_mode(&mut self) {
         self.exhaust.off();
         self.humidifier.off();
+        self.heater.off();
         tracing::error!(tag = "fatal", "sensor failed");
         loop {
             Timer::after(self.config.loop_delay).await;

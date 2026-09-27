@@ -1,7 +1,7 @@
 use embassy_time::Duration;
 use serde::{Deserialize, Serialize};
 
-use crate::{exhaust::ExhaustConfig, humidifier::HumidifierConfig};
+use crate::{exhaust::ExhaustConfig, heater::HeaterConfig, humidifier::HumidifierConfig};
 
 /// Dto of `MushclimConfig`.
 /// As `MushclimConfig` uses embassy and other local types for ergonomics, so it cannot be serialized easily.
@@ -16,8 +16,6 @@ pub struct MushclimConfigDto {
     pub humidity_lower_bound: u16,
     /// Upper bound of humidity threshold, e.g. 90%
     pub humidity_upper_bound: u16,
-    /// Retry count on any error
-    pub retry_count: u16,
     /// Maximum temperature delta over single tick
     pub max_temp_delta: u16,
     /// Maximum humidity delta over single tick
@@ -32,8 +30,14 @@ pub struct MushclimConfigDto {
     pub exhaust_cooldown: u64,
     /// Maximum time for exhaust to work, trying to hit co2ppm_lower_bound before going into cooldown.
     pub exhaust_timeout: u64,
+    /// Lower bound of temperature threshold
+    pub temperature_lower_bound: u8,
+    /// Upper bound of temperature threshold
+    pub temperature_upper_bound: u8,
     /// Tick/loop frequency
     pub loop_delay: u64,
+    /// Retry count on any error
+    pub retry_count: u16,
 }
 
 impl Default for MushclimConfigDto {
@@ -42,6 +46,8 @@ impl Default for MushclimConfigDto {
             preserve: true,
             humidity_lower_bound: 86,
             humidity_upper_bound: 90,
+            temperature_lower_bound: 18,
+            temperature_upper_bound: 21,
             retry_count: 10,
             max_temp_delta: 9,
             max_humidity_delta: 30,
@@ -62,6 +68,7 @@ impl Default for MushclimConfigDto {
 pub struct MushclimConfig {
     pub humidifier: HumidifierConfig,
     pub exhaust: ExhaustConfig,
+    pub heater: HeaterConfig,
     pub loop_delay: Duration,
     pub retry_count: usize,
 }
@@ -70,6 +77,7 @@ impl MushclimConfigDto {
     /// Converts the DTO into the actual runtime `MushclimConfig`.
     pub fn as_local(&self) -> MushclimConfig {
         MushclimConfig {
+            heater: self.into(),
             humidifier: self.into(),
             exhaust: self.into(),
             loop_delay: Duration::from_secs(self.loop_delay),

@@ -166,7 +166,7 @@ struct Esp32c5Platform<'a> {
 }
 
 impl<'a> MushclimPlatform for Esp32c5Platform<'a> {
-    type DiscoPin = Output<'a>;
+    type HeaterPin = Output<'a>;
     type ExhaustPin = Output<'a>;
     type HumidifierPin = Output<'a>;
     type LightPin = Output<'a>;
