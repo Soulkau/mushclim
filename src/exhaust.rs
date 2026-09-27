@@ -48,17 +48,17 @@ impl ExhaustState {
         let over = co2 >= *config.co2pmm_treshold.end();
         let under = co2 <= *config.co2pmm_treshold.start();
 
-        tracing::debug!("[Exhaust]: co2={} over={} under={}", co2, over, under);
+        tracing::debug!(tag = "exhaust", "co2={} over={} under={}", co2, over, under);
 
         match self {
             //If state is idle and co2 is over or above treshold run exhaust with timeout
             ExhaustState::Idle => {
                 if over {
-                    tracing::debug!("[Exhaust]: idle -> running, co2 over threshold");
+                    tracing::debug!(tag = "exhaust", "idle -> running, co2 over threshold");
                     *self = ExhaustState::Runnning(DueTimer::new(config.exhaust_timeout));
                     true
                 } else {
-                    tracing::debug!("[Exhaust]: idle, staying off");
+                    tracing::debug!(tag = "exhaust", "idle, staying off");
                     false
                 }
             }
@@ -66,25 +66,26 @@ impl ExhaustState {
             ExhaustState::Runnning(timer) => {
                 if timer.due() || under {
                     tracing::debug!(
-                        "[Exhaust]: running -> cooldown (timeout_due={}, under_threshold={})",
+                        tag = "exhaust",
+                        "running -> cooldown (timeout_due={}, under_threshold={})",
                         timer.due(),
                         under
                     );
                     *self = ExhaustState::Cooldown(DueTimer::new(config.exhaust_cooldown));
                     false
                 } else {
-                    tracing::debug!("[Exhaust]: running, staying on");
+                    tracing::debug!(tag = "exhaust", "running, staying on");
                     true
                 }
             }
             //If exhaust is on cooldown, check whether it has passed and rerefresh.
             ExhaustState::Cooldown(timer) => {
                 if timer.due() {
-                    tracing::debug!("[Exhaust]: cooldown finished -> idle, re-refreshing");
+                    tracing::debug!(tag = "exhaust", "cooldown finished -> idle, re-refreshing");
                     *self = ExhaustState::Idle;
                     self.refresh(measurement, config) //Rerefresh as cooldown has passed and co2ppm maybe over the high treshold
                 } else {
-                    tracing::debug!("[Exhaust]: cooldown, waiting");
+                    tracing::debug!(tag = "exhaust", "cooldown, waiting");
                     false
                 }
             }
@@ -167,23 +168,14 @@ impl<P: OutputPin> ExhaustManager<P> {
         self.switch(should_be_on)
     }
 
-    pub fn tick_cycle(&mut self) -> bool {
-        let Mode::Cycle { cycle_timer } = &mut self.mode else {
-            tracing::warn!("[Exhaust]: tick_cycle called while in Measurement mode, ignoring");
-            return self.exhaust.is_on();
-        };
-        let should_be_on = cycle_timer.tick();
-        self.switch(should_be_on)
-    }
-
-    fn switch(&mut self, should_be_on: bool) -> bool {
+    fn switch(&mut self, on: bool) -> bool {
         let is_on = self.exhaust.is_on();
-        if should_be_on && !is_on {
+        if on && !is_on {
             self.exhaust.on().ok();
-            tracing::debug!("[Exhaust]: Turned on");
-        } else if !should_be_on && is_on {
+            tracing::debug!(tag = "exhaust", "Turned on");
+        } else if !on && is_on {
             self.exhaust.off().ok();
-            tracing::debug!("[Exhaust]: Turned off");
+            tracing::debug!(tag = "exhaust", "Turned off");
         }
         should_be_on
     }

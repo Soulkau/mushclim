@@ -80,6 +80,7 @@ impl<P: OutputPin> Humidifier<P> {
         if current_humidity <= low_bound {
             if !self.switch.is_on() {
                 tracing::info!(
+                    tag = "humidifier",
                     "Humidity ({}%) below low bound ({}%). Turning humidifier ON.",
                     current_humidity,
                     low_bound
@@ -89,6 +90,7 @@ impl<P: OutputPin> Humidifier<P> {
         } else if current_humidity >= comfort_bound {
             if self.switch.is_on() {
                 tracing::info!(
+                    tag = "humidifier",
                     "Humidity ({}%) reached comfort bound ({}%). Turning humidifier OFF.",
                     current_humidity,
                     comfort_bound
@@ -131,7 +133,10 @@ impl<P: OutputPin> Humidifier<P> {
     fn pause_for_exhaust(&mut self, is_exhaust_on: bool) -> bool {
         if is_exhaust_on {
             if self.switch.is_on() {
-                tracing::info!("[Humidifer]: Paused humidifer due to exhaust being on");
+                tracing::info!(
+                    tag = "humidifier",
+                    "Paused humidifer due to exhaust being on"
+                );
             }
             self.switch.off().ok();
             return true;

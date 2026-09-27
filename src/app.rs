@@ -80,9 +80,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.lights.on().ok();
         self.disco.on().ok();
 
-        tracing::info!("[MushclimApp] Starting sensor calibration");
+        tracing::info!(tag = "mushclim_app", "Starting sensor calibration");
         self.measurement_manager.init().await;
-        tracing::info!("[MushclimApp] Finished sensor calibration");
+        tracing::info!(tag = "mushclim_app", "Finished sensor calibration");
         let mut ticker = Ticker::every(self.config.loop_delay);
 
         loop {
@@ -94,7 +94,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
                     // Timer expired normally, loop around for next tick
                 }
                 Either::Second(config_dto) => {
-                    tracing::info!("[MushclimApp] Config update received");
+                    tracing::info!(tag = "mushclim_app", "Config update received");
                     self.hard_config_update(config_dto.as_local()).await;
                     self.storage.set(CONF_KEY, &config_dto).await;
                     ticker = Ticker::every(self.config.loop_delay);
@@ -108,7 +108,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.exhaust.force_config(&self.config);
         self.metrics.force_config(&self.config);
         self.humidifier.force_config(&self.config);
-        tracing::info!("[MushclimApp] Hard config update performed");
+        tracing::info!(tag = "mushclim_app", "Hard config update performed");
     }
     ///Tick app single time.
     async fn tick_step(&mut self) {
@@ -122,7 +122,8 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             }
             None => {
                 tracing::error!(
-                    "[MushclimApp] CRITICAL: Sensor totally failed or reading is permanently erratic"
+                    tag = "mushclim_app",
+                    "CRITICAL: Sensor totally failed or reading is permanently erratic"
                 );
                 self.sensor_failure_mode().await;
             }
@@ -170,8 +171,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             exhaust_on: self.exhaust.is_turned_on(),
             humidifier_on: self.humidifier.is_on(),
         };
-        tracing::info!(
-            "[MushclimApp] Temp: {}°C, Humidity: {}% Humidifier: {}, Exhaust: {}",
+        tracing::debug!(
+            tag = "mushclim_app",
+            "Temp: {}°C, Humidity: {}% Humidifier: {}, Exhaust: {}",
             stats.temperature,
             stats.humidity,
             stats.humidifier_on,
