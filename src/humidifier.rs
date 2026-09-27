@@ -48,7 +48,7 @@ impl<P: OutputPin> Humidifier<P> {
             if !self.switch.is_on() {
                 tracing::info!(
                     tag = "humidifier",
-                    "Humidity ({}%) below low bound ({}%). Turning humidifier ON.",
+                    "humidity ({}%) below low bound ({}%). Turning humidifier ON.",
                     current_humidity,
                     low_bound
                 );
@@ -58,7 +58,7 @@ impl<P: OutputPin> Humidifier<P> {
             if self.switch.is_on() {
                 tracing::info!(
                     tag = "humidifier",
-                    "Humidity ({}%) reached comfort bound ({}%). Turning humidifier OFF.",
+                    "humidity ({}%) reached comfort bound ({}%). Turning humidifier OFF.",
                     current_humidity,
                     comfort_bound
                 );
@@ -72,7 +72,7 @@ impl<P: OutputPin> Humidifier<P> {
             if self.switch.is_on() {
                 tracing::info!(
                     tag = "humidifier",
-                    "Paused humidifer due to exhaust being on"
+                    "paused humidifer due to exhaust being on"
                 );
             }
             self.switch.off().ok();

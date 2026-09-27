@@ -178,7 +178,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         };
         tracing::debug!(
             tag = "app",
-            "Temp: {}°C, Humidity: {}% Humidifier: {}, Exhaust: {}",
+            "temp: {}°C, humidity: {}% humidifier: {}, exhaust: {}",
             stats.temperature,
             stats.humidity,
             stats.humidifier_on,
