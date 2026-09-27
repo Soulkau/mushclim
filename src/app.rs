@@ -1,13 +1,16 @@
 use driverse::{relay::Relay, stcc4::Stcc4};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker, Timer};
+use embedded_hal::digital::OutputPin;
+use embedded_hal_async::{delay::DelayNs, i2c::I2c};
+use embedded_storage::nor_flash::NorFlash;
 use ivy::{
     flash::{FlashStorage, StorageKey},
     mqtt::{SizedMqttHandle, Subscription},
 };
 
 use crate::{
-    MushclimPlatform, MushclimStatus,
+    MushclimStatus,
     config::{MushclimConfig, MushclimConfigDto},
     exhaust::Exhaust,
     heater::Heater,
@@ -25,6 +28,19 @@ macro_rules! create_relay {
     ($pin:expr) => {
         Relay::new($pin, driverse::relay::ActiveLevel::Low, false).unwrap()
     };
+}
+
+/// Used by chips to provide support for mushclim.
+pub trait MushclimPlatform {
+    type ExhaustPin: OutputPin;
+    type LightPin: OutputPin;
+    type HeaterPin: OutputPin;
+    type HumidifierPin: OutputPin;
+    // Persistent(nvs) flash region
+    type NvsStorage: NorFlash + 'static;
+    // Stcc4
+    type Sensor: I2c;
+    type Delay: DelayNs;
 }
 
 pub struct MushclimPins<P: MushclimPlatform> {

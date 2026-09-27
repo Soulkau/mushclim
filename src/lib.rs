@@ -1,8 +1,5 @@
 #![no_std]
 
-use embedded_hal::digital::OutputPin;
-use embedded_hal_async::{delay::DelayNs, i2c::I2c};
-use embedded_storage::nor_flash::NorFlash;
 use serde::Serialize;
 
 pub mod app;
@@ -26,16 +23,3 @@ pub struct MushclimStatus {
 }
 
 pub const METRIC_SNAPSHOT_AMOUNT: usize = 10;
-
-/// Used by chips to provide support for mushclim.
-pub trait MushclimPlatform {
-    type ExhaustPin: OutputPin;
-    type LightPin: OutputPin;
-    type HeaterPin: OutputPin;
-    type HumidifierPin: OutputPin;
-    // Persistent(nvs) flash region
-    type NvsStorage: NorFlash + 'static;
-    // Stcc4
-    type Sensor: I2c;
-    type Delay: DelayNs;
-}

@@ -26,9 +26,7 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{Async, time};
 use esp_radio::wifi::Interface;
 use esp_storage::FlashStorage;
-use mushclim::MushclimPlatform;
-use mushclim::app::MUSHCLIM_MQTT_PAYLOAD;
-use mushclim::app::{MushclimApp, MushclimPins};
+use mushclim::app::{MushclimApp, MushclimPins, MushclimPlatform};
 use mushclim::config::MushclimConfigDto;
 use mushclim::ivy::logger::init_subscriber;
 use mushclim::ivy::mqtt::{
