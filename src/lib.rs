@@ -10,7 +10,6 @@ pub mod config;
 pub mod exhaust;
 pub mod humidifier;
 pub mod measurements;
-pub mod metrics;
 pub mod timer;
 extern crate alloc;
 

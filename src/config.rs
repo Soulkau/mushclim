@@ -34,8 +34,6 @@ pub struct MushclimConfigDto {
     pub exhaust_timeout: u64,
     /// Tick/loop frequency
     pub loop_delay: u64,
-    /// How much time should pass until metric is sent
-    pub metric_send_period: u64,
 }
 
 impl Default for MushclimConfigDto {
@@ -53,7 +51,6 @@ impl Default for MushclimConfigDto {
             exhaust_cooldown: 5 * 60,
             exhaust_timeout: 60 * 3,
             loop_delay: 30,
-            metric_send_period: 3600,
         }
     }
 }
@@ -66,7 +63,6 @@ pub struct MushclimConfig {
     pub humidifier: HumidifierConfig,
     pub exhaust: ExhaustConfig,
     pub loop_delay: Duration,
-    pub metric_send_period: Duration,
     pub retry_count: usize,
 }
 
@@ -77,7 +73,6 @@ impl MushclimConfigDto {
             humidifier: self.into(),
             exhaust: self.into(),
             loop_delay: Duration::from_secs(self.loop_delay),
-            metric_send_period: Duration::from_secs(self.metric_send_period),
             retry_count: self.retry_count as usize,
         }
     }

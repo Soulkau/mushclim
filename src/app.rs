@@ -12,7 +12,6 @@ use crate::{
     exhaust::Exhaust,
     humidifier::Humidifier,
     measurements::{Measurement, MeasurementError, MeasurementManager},
-    metrics::MetricManager,
 };
 
 const CONF_KEY: StorageKey = StorageKey::new(101);
@@ -43,7 +42,6 @@ pub struct MushclimApp<P: MushclimPlatform> {
     lights: Relay<P::LightPin>,
     humidifier: Humidifier<P::HumidifierPin>,
     disco: Relay<P::DiscoPin>,
-    metrics: MetricManager,
     config_sub: Subscription<MushclimConfigDto>,
     mqtt_handle: MushclimMqttHandle,
     storage: FlashStorage<P::NvsStorage>,
@@ -68,7 +66,6 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             lights: create_relay!(pins.light),
             humidifier: Humidifier::new(create_relay!(pins.humidifier), &config.humidifier),
             disco: create_relay!(pins.disco),
-            metrics: MetricManager::new(&config),
             config,
             config_sub,
             mqtt_handle,
@@ -107,14 +104,12 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     async fn hard_config_update(&mut self, config: MushclimConfig) {
         self.config = config;
         self.exhaust.force_config(&self.config);
-        self.metrics.force_config(&self.config);
         self.humidifier.force_config(&self.config);
     }
     ///Tick app single time.
     async fn tick_step(&mut self) {
         match self.acquire_measurement().await {
             Some(measurements) => {
-                self.metrics.feed(measurements, &self.mqtt_handle).await;
                 self.exhaust.tick_with_measurements(&measurements);
                 self.humidifier
                     .tick(&measurements, self.exhaust.is_turned_on());
@@ -125,6 +120,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
                 self.sensor_failure_mode().await;
             }
         }
+        tracing::info!(tag = "ping", "ok");
     }
 
     /// Attempts to get measurement, will retry `config.retry_count` times, before giving up.
@@ -163,7 +159,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         loop {
             Timer::after(self.config.loop_delay).await;
             if self.acquire_measurement().await.is_some() {
-                tracing::error!(tag = "fatal", "sensor recovered");
+                tracing::info!(tag = "app", "sensor recovered");
                 break;
             }
         }
