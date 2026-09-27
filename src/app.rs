@@ -80,9 +80,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.lights.on().ok();
         self.disco.on().ok();
 
-        tracing::info!(tag = "mushclim_app", "Starting sensor calibration");
-        self.measurement_manager.init().await;
-        tracing::info!(tag = "mushclim_app", "Finished sensor calibration");
+        tracing::info!(tag = "app", "starting sensor calibration");
+        self.sensor.init().await;
+        tracing::info!(tag = "app", "finished sensor calibration");
         let mut ticker = Ticker::every(self.config.loop_delay);
 
         loop {
@@ -94,10 +94,11 @@ impl<P: MushclimPlatform> MushclimApp<P> {
                     // Timer expired normally, loop around for next tick
                 }
                 Either::Second(config_dto) => {
-                    tracing::info!(tag = "mushclim_app", "Config update received");
+                    tracing::info!(tag = "app", "config update received");
                     self.hard_config_update(config_dto.as_local()).await;
                     self.storage.set(CONF_KEY, &config_dto).await;
                     ticker = Ticker::every(self.config.loop_delay);
+                    tracing::info!(tag = "app", "config update completed");
                 }
             }
         }
@@ -121,10 +122,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
                 self.log_app_state(measurements).await;
             }
             None => {
-                tracing::error!(
-                    tag = "mushclim_app",
-                    "CRITICAL: Sensor totally failed or reading is permanently erratic"
-                );
+                tracing::warn!(tag = "app", "failed to get measurements");
                 self.sensor_failure_mode().await;
             }
         }
@@ -138,12 +136,20 @@ impl<P: MushclimPlatform> MushclimApp<P> {
                     return Some(stats);
                 }
                 Err(MeasurementError::Sensor) => {
-                    tracing::warn!("Hardware read error on attempt {}. Retrying...", attempt);
-                    Timer::after_secs(2).await;
+                    tracing::warn!(
+                        tag = "app",
+                        "hardware read error on attempt {}. Retrying...",
+                        attempt
+                    );
+                    Timer::after(retry_delay).await;
                 }
                 Err(MeasurementError::Crc) => {
-                    tracing::warn!("Sensor crc mismatch {}. Retrying shortly.", attempt);
-                    Timer::after_secs(2).await;
+                    tracing::warn!(
+                        tag = "app",
+                        "sensor crc mismatch {}. Retrying shortly.",
+                        attempt
+                    );
+                    Timer::after(retry_delay).await;
                 }
             }
         }
@@ -153,7 +159,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     async fn sensor_failure_mode(&mut self) -> ! {
         self.exhaust.off();
         self.humidifier.off();
-
+        tracing::error!(tag = "fatal", "sensor failed");
         loop {
             Timer::after(self.config.loop_delay).await;
         }
@@ -168,7 +174,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             humidifier_on: self.humidifier.is_on(),
         };
         tracing::debug!(
-            tag = "mushclim_app",
+            tag = "app",
             "Temp: {}°C, Humidity: {}% Humidifier: {}, Exhaust: {}",
             stats.temperature,
             stats.humidity,
