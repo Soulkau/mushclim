@@ -1,7 +1,7 @@
 use crate::{
     config::{MushclimConfig, MushclimConfigDto},
     measurements::Measurement,
-    timer::{CycleTimer, DueTimer, DurationExts},
+    timer::{DueTimer, DurationExts},
 };
 use core::{fmt::Write, ops::RangeInclusive};
 use driverse::relay::Relay;
@@ -14,8 +14,6 @@ pub struct ExhaustConfig {
     pub co2pmm_treshold: RangeInclusive<u16>,
     pub exhaust_cooldown: Duration,
     pub exhaust_timeout: Duration,
-    pub safe_exhaust_duty: Duration,
-    pub safe_exhaust_duty_interval: Duration,
 }
 
 impl From<&MushclimConfigDto> for ExhaustConfig {
@@ -24,8 +22,6 @@ impl From<&MushclimConfigDto> for ExhaustConfig {
             co2pmm_treshold: dto.co2ppm_lower_bound..=dto.co2ppm_upper_bound,
             exhaust_cooldown: Duration::from_secs(dto.exhaust_cooldown),
             exhaust_timeout: Duration::from_secs(dto.exhaust_timeout),
-            safe_exhaust_duty: Duration::from_secs(dto.safe_exhaust_duty),
-            safe_exhaust_duty_interval: Duration::from_secs(dto.safe_exhaust_duty_interval),
         }
     }
 }
@@ -118,53 +114,23 @@ impl ExhaustState {
     }
 }
 
-enum Mode {
-    Measurement { state: ExhaustState },
-    Cycle { cycle_timer: CycleTimer },
-}
-
-pub(crate) struct ExhaustManager<P: OutputPin> {
+pub(crate) struct Exhaust<P: OutputPin> {
     exhaust: Relay<P>,
     exhaust_config: ExhaustConfig,
-    mode: Mode,
+    state: ExhaustState,
 }
 
-impl<P: OutputPin> ExhaustManager<P> {
+impl<P: OutputPin> Exhaust<P> {
     pub fn new(exhaust: Relay<P>, config: &ExhaustConfig) -> Self {
         Self {
             exhaust,
             exhaust_config: config.clone(),
-            mode: Mode::Measurement {
-                state: ExhaustState::default(),
-            },
+            state: ExhaustState::default(),
         }
     }
 
-    pub fn switch_to_cycle(&mut self) {
-        tracing::info!("[Exhaust]: switching to cycle mode");
-        self.mode = Mode::Cycle {
-            cycle_timer: CycleTimer::new(
-                self.exhaust_config.safe_exhaust_duty_interval,
-                self.exhaust_config.safe_exhaust_duty,
-            ),
-        };
-        self.switch(false);
-    }
-
-    pub fn switch_to_measurement(&mut self) {
-        tracing::info!("[Exhaust]: switching to measurement mode");
-        self.mode = Mode::Measurement {
-            state: ExhaustState::default(),
-        };
-        self.switch(false);
-    }
-
     pub fn tick_with_measurements(&mut self, measurements: &Measurement) -> bool {
-        let Mode::Measurement { state } = &mut self.mode else {
-            tracing::warn!("[Exhaust]: tick_measurement called while in Cycle mode, ignoring");
-            return self.exhaust.is_on();
-        };
-        let should_be_on = state.refresh(measurements, &self.exhaust_config);
+        let should_be_on = self.state.refresh(measurements, &self.exhaust_config);
         self.switch(should_be_on)
     }
 
@@ -177,7 +143,11 @@ impl<P: OutputPin> ExhaustManager<P> {
             self.exhaust.off().ok();
             tracing::debug!(tag = "exhaust", "Turned off");
         }
-        should_be_on
+        on
+    }
+
+    pub fn off(&mut self) {
+        self.switch(false);
     }
 
     pub fn is_turned_on(&self) -> bool {
@@ -189,26 +159,6 @@ impl<P: OutputPin> ExhaustManager<P> {
     }
 
     pub fn state_log(&self) -> String<32> {
-        match &self.mode {
-            Mode::Measurement { state } => state.as_log(),
-            Mode::Cycle { cycle_timer } => {
-                let (is_on_duty, until_switch) = cycle_timer.time_until_change();
-                let state = if is_on_duty { "off" } else { "on" };
-                let mut s = String::new();
-                if write!(
-                    s,
-                    "on: {} / {} in {}",
-                    is_on_duty,
-                    state,
-                    until_switch.pretty_string()
-                )
-                .is_err()
-                {
-                    s.clear();
-                    let _ = s.push_str("fan state fmt err");
-                }
-                s
-            }
-        }
+        self.state.as_log()
     }
 }

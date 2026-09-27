@@ -24,10 +24,6 @@ pub struct MushclimConfigDto {
     pub max_humidity_delta: u16,
     /// Number of calibration samples
     pub calibration_samples: usize,
-    /// Interval between humidity duty cycles in safe mode
-    pub safe_humidity_duty_interval: u64,
-    /// Duration of humidity duty cycle in safe mode
-    pub safe_humidity_duty: u64,
     /// Lower bound of CO2 ppm threshold
     pub co2ppm_lower_bound: u16,
     /// Upper bound of CO2 ppm threshold
@@ -36,10 +32,6 @@ pub struct MushclimConfigDto {
     pub exhaust_cooldown: u64,
     /// Maximum time for exhaust to work, trying to hit co2ppm_lower_bound before going into cooldown.
     pub exhaust_timeout: u64,
-    /// Exhaust duty duration
-    pub safe_exhaust_duty: u64,
-    /// Interval between exhaust duty cycles
-    pub safe_exhaust_duty_interval: u64,
     /// Tick/loop frequency
     pub loop_delay: u64,
     /// How much time should pass until metric is sent
@@ -56,14 +48,10 @@ impl Default for MushclimConfigDto {
             max_temp_delta: 9,
             max_humidity_delta: 30,
             calibration_samples: 10,
-            safe_humidity_duty_interval: 20 * 60,
-            safe_humidity_duty: 4 * 60,
             co2ppm_lower_bound: 700,
             co2ppm_upper_bound: 1000,
             exhaust_cooldown: 5 * 60,
             exhaust_timeout: 60 * 3,
-            safe_exhaust_duty: 60,
-            safe_exhaust_duty_interval: 30 * 60,
             loop_delay: 30,
             metric_send_period: 3600,
         }

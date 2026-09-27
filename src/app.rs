@@ -9,7 +9,7 @@ use ivy::{
 use crate::{
     MushclimPlatform, MushclimStats,
     config::{MushclimConfig, MushclimConfigDto},
-    exhaust::ExhaustManager,
+    exhaust::Exhaust,
     humidifier::Humidifier,
     measurements::{Measurement, MeasurementError, MeasurementManager},
     metrics::MetricManager,
@@ -38,7 +38,7 @@ pub struct MushclimPins<P: MushclimPlatform> {
 
 pub struct MushclimApp<P: MushclimPlatform> {
     measurement_manager: MeasurementManager<P::Sensor, P::Delay>,
-    exhaust: ExhaustManager<P::ExhaustPin>,
+    exhaust: Exhaust<P::ExhaustPin>,
     config: MushclimConfig,
     lights: Relay<P::LightPin>,
     humidifier: Humidifier<P::HumidifierPin>,
@@ -64,7 +64,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
 
         Self {
             measurement_manager: MeasurementManager::new(Stcc4::new(pins.sensor, pins.delay)),
-            exhaust: ExhaustManager::new(create_relay!(pins.exhaust), &config.exhaust),
+            exhaust: Exhaust::new(create_relay!(pins.exhaust), &config.exhaust),
             lights: create_relay!(pins.light),
             humidifier: Humidifier::new(create_relay!(pins.humidifier), &config.humidifier),
             disco: create_relay!(pins.disco),
@@ -151,14 +151,10 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     }
 
     async fn sensor_failure_mode(&mut self) -> ! {
-        self.exhaust.switch_to_cycle();
-        self.humidifier.set_cycled_mode();
+        self.exhaust.off();
+        self.humidifier.off();
 
         loop {
-            let exhaust_on = self.exhaust.tick_cycle();
-
-            self.humidifier.tick_cycled(exhaust_on);
-
             Timer::after(self.config.loop_delay).await;
         }
     }
