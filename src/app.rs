@@ -7,7 +7,7 @@ use ivy::{
 };
 
 use crate::{
-    MushclimPlatform, MushclimStats,
+    MushclimPlatform, MushclimStatus,
     config::{MushclimConfig, MushclimConfigDto},
     exhaust::Exhaust,
     humidifier::Humidifier,
@@ -160,7 +160,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
     }
 
     async fn log_app_state(&self, measurements: Measurement) {
-        let stats = MushclimStats {
+        let stats = MushclimStatus {
             temperature: measurements.temperature_c as i16,
             humidity: measurements.humidity_pct as u16,
             co2ppm: measurements.co2_ppm,
@@ -175,6 +175,9 @@ impl<P: MushclimPlatform> MushclimApp<P> {
             stats.humidifier_on,
             self.exhaust.state_log()
         );
-        self.mqtt_handle.publish("mushclim/stats", stats).await.ok();
+        self.mqtt_handle
+            .publish("mushclim/status", stats)
+            .await
+            .ok();
     }
 }

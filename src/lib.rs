@@ -17,7 +17,7 @@ extern crate alloc;
 pub use ivy;
 
 #[derive(Debug, Serialize)]
-pub struct MushclimStats {
+pub struct MushclimStatus {
     pub temperature: i16,
     pub humidity: u16,
     pub co2ppm: u16,
