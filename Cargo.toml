@@ -2,7 +2,7 @@
 edition = "2024"
 name = "mushclim"
 rust-version = "1.88"
-version = "0.3.0"
+version = "0.3.1"
 
 [lib]
 test = false
@@ -22,7 +22,7 @@ opt-level = 's'
 overflow-checks = false
 
 [dependencies]
-ivy = {git = "https://github.com/Soulkau/Ivy.git", rev = "05dd457"}
+ivy = {git = "https://github.com/Soulkau/Ivy.git", tag = "v0.2.4"}
 # esp-specific
 
 

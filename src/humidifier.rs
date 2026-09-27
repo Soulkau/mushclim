@@ -1,7 +1,6 @@
 use core::ops::RangeInclusive;
 
 use driverse::relay::Relay;
-use embassy_time::Duration;
 use embedded_hal::digital::OutputPin;
 
 use crate::{
