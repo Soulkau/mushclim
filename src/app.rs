@@ -1,6 +1,6 @@
 use driverse::{relay::Relay, stcc4::Stcc4};
 use embassy_futures::select::{Either, select};
-use embassy_time::{Ticker, Timer};
+use embassy_time::{Duration, Ticker, Timer};
 use ivy::{
     flash::{FlashStorage, StorageKey},
     mqtt::{SizedMqttHandle, Subscription},
@@ -81,7 +81,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.disco.on().ok();
 
         tracing::info!(tag = "app", "starting sensor calibration");
-        self.sensor.init().await;
+        self.measurement_manager.init().await;
         tracing::info!(tag = "app", "finished sensor calibration");
         let mut ticker = Ticker::every(self.config.loop_delay);
 
@@ -109,7 +109,6 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         self.exhaust.force_config(&self.config);
         self.metrics.force_config(&self.config);
         self.humidifier.force_config(&self.config);
-        tracing::info!(tag = "mushclim_app", "Hard config update performed");
     }
     ///Tick app single time.
     async fn tick_step(&mut self) {
@@ -130,6 +129,7 @@ impl<P: MushclimPlatform> MushclimApp<P> {
 
     /// Attempts to get measurement, will retry `config.retry_count` times, before giving up.
     async fn acquire_measurement(&mut self) -> Option<Measurement> {
+        let retry_delay = Duration::from_secs(3);
         for attempt in 1..=self.config.retry_count {
             match self.measurement_manager.measure().await {
                 Ok(stats) => {
@@ -156,12 +156,16 @@ impl<P: MushclimPlatform> MushclimApp<P> {
         None
     }
 
-    async fn sensor_failure_mode(&mut self) -> ! {
+    async fn sensor_failure_mode(&mut self) {
         self.exhaust.off();
         self.humidifier.off();
         tracing::error!(tag = "fatal", "sensor failed");
         loop {
             Timer::after(self.config.loop_delay).await;
+            if self.acquire_measurement().await.is_some() {
+                tracing::error!(tag = "fatal", "sensor recovered");
+                break;
+            }
         }
     }
 
