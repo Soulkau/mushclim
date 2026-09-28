@@ -5,18 +5,15 @@
     reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
     holding buffers for the duration of a data transfer."
 )]
-#![feature(allocator_api)]
 
 extern crate alloc;
 use core::marker::PhantomData;
 use core::ops::Range;
 
 use crate::wifi::{WifiCredentials, wifi_task};
-use alloc::boxed::Box;
 use embassy_executor::Spawner;
 use embassy_net::{Runner, StackResources};
 use embassy_time::Delay;
-use embedded_tls::TlsConfig;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Output, OutputConfig};
@@ -28,13 +25,10 @@ use esp_radio::wifi::Interface;
 use esp_storage::FlashStorage;
 use mushclim::app::{MushclimApp, MushclimPins, MushclimPlatform};
 use mushclim::config::MushclimConfigDto;
-use mushclim::ivy::logger::init_subscriber;
-use mushclim::ivy::mqtt::{
-    MqttLogger, MqttModule, MqttState, MqttTcpClient, MqttTcpClientState, MqttTlsState,
-};
-use mushclim::ivy::{
-    count, declare_subcriptions, init_flash, init_logger, init_storage, mk_static,
-};
+
+use mushclim::ivy::mqtt::{MqttCredentials, MqttLogger, MqttModule, MqttResources};
+use mushclim::ivy::{self};
+use mushclim::ivy::{count, declare_subcriptions, init_flash, init_storage, mk_static};
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use tracing::Level;
@@ -65,7 +59,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 68 * 1024);
 
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-    //esp_println::logger::init_logger(log::LevelFilter::Debug);
+    // esp_println::logger::init_logger(log::LevelFilter::Debug);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_interrupt =
@@ -110,26 +104,25 @@ async fn main(spawner: Spawner) -> ! {
     // NOTE: This is temporary trng workaround for esp32c5, meanwhile trng is not yet available
     let trng = rand_chacha::ChaChaRng::seed_from_u64(seed);
 
+    let mqtt_creds = MqttCredentials {
+        username: option_env!("NATS_USER").unwrap().try_into().unwrap(),
+        password: option_env!("NATS_PASS").unwrap().try_into().unwrap(),
+        client_id: option_env!("NATS_CLIENT_ID").unwrap().try_into().unwrap(),
+    };
+
+    let mqtt_resources = MqttResources::leak_in(stack, trng, &esp_alloc::ExternalMemory);
+
     let mqtt_handle = mushclim::ivy::actor!(
         spawner,
         MushclimMqtt,
-        MushclimMqtt::new(
-            "mushdev",
-            stack,
-            handles,
-            leak(MqttState::new()),
-            leak(MqttTlsState::new()),
-            leak(MqttTcpClient::new(stack, leak(MqttTcpClientState::new()))),
-            leak(TlsConfig::default().enable_rsa_signatures()),
-            trng
-        )
+        MushclimMqtt::new(mqtt_resources, mqtt_creds, handles)
     )
     .unwrap();
 
-    init_logger!(
+    ivy::init_logger!(
         spawner,
         MqttLogger::new("mushclim/dev/logs", mqtt_handle.clone()),
-        init_subscriber(Level::INFO),
+        ivy::logger::init_subscriber(Level::INFO),
         MqttLogger
     );
 
@@ -178,8 +171,4 @@ pub async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     loop {
         runner.run().await;
     }
-}
-
-fn leak<T>(value: T) -> &'static mut T {
-    Box::leak(Box::new_in(value, esp_alloc::ExternalMemory))
 }
