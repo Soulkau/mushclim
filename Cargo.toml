@@ -22,7 +22,7 @@ opt-level = 's'
 overflow-checks = false
 
 [dependencies]
-ivy = {git = "https://github.com/Soulkau/Ivy.git", tag = "v0.2.4"}
+ivy = {git = "https://github.com/Soulkau/ivy.git", rev = "e45f0c573249241f8e8c9a13acea0f464681a917"}
 # esp-specific
 
 
